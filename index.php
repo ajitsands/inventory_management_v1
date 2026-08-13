@@ -39,27 +39,33 @@ if (strpos($uri, '/api/') === 0) {
     exit;
 }
 
-// 2. Serve frontend production static files if dist exists
+// 2. Serve frontend production static files
 $distFile = __DIR__ . '/frontend/dist' . $uri;
-if ($uri !== '/' && file_exists($distFile) && !is_dir($distFile)) {
-    $mime = mime_content_type($distFile);
+$rootFile = __DIR__ . $uri;
+$targetFile = (file_exists($distFile) && !is_dir($distFile)) ? $distFile : ((file_exists($rootFile) && !is_dir($rootFile)) ? $rootFile : null);
+
+if ($uri !== '/' && $targetFile) {
+    $mime = mime_content_type($targetFile);
     if (str_ends_with($uri, '.css')) $mime = 'text/css';
     if (str_ends_with($uri, '.js')) $mime = 'application/javascript';
     if (str_ends_with($uri, '.png')) $mime = 'image/png';
     if (str_ends_with($uri, '.jpg')) $mime = 'image/jpeg';
     header("Content-Type: $mime");
-    readfile($distFile);
+    readfile($targetFile);
     exit;
 }
 
-// 3. Fallback to built React Single Page Application (frontend/dist/index.html)
+// 3. Fallback to built React Single Page Application (frontend/dist/index.html or backend/index.html)
 $distIndex = __DIR__ . '/frontend/dist/index.html';
-if (file_exists($distIndex)) {
+$rootIndex = __DIR__ . '/backend/index.html';
+$targetIndex = file_exists($distIndex) ? $distIndex : (file_exists($rootIndex) ? $rootIndex : null);
+
+if ($targetIndex) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
     header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
     header('Content-Type: text/html; charset=utf-8');
-    readfile($distIndex);
+    readfile($targetIndex);
     exit;
 }
 
