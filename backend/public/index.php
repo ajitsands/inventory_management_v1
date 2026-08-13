@@ -4,6 +4,33 @@
 require_once __DIR__ . '/../core/App.php';
 require_once __DIR__ . '/../core/Router.php';
 
+// Auto DB setup check
+try {
+    require_once __DIR__ . '/../core/Model.php';
+    $pdo = Model::getDB();
+    
+    // Check if 'users' table exists. If not, setup the database.
+    $stmt = $pdo->query("SHOW TABLES LIKE 'users'");
+    $exists = $stmt->fetch();
+    
+    if (!$exists) {
+        $setupSqlPath = __DIR__ . '/../database/database_setup.sql';
+        if (file_exists($setupSqlPath)) {
+            $sql = file_get_contents($setupSqlPath);
+            // Split SQL into individual statements by semicolon+newline
+            $queries = preg_split("/;[\r\n]+/", $sql);
+            foreach ($queries as $query) {
+                $query = trim($query);
+                if (!empty($query)) {
+                    $pdo->exec($query);
+                }
+            }
+        }
+    }
+} catch (\Exception $e) {
+    // Fail silently, error will be naturally reported if/when the app attempts DB queries
+}
+
 // Instantiate Router
 $router = new Router();
 
