@@ -49,8 +49,21 @@ class AuthController extends Controller {
     }
 
     public function getUsers() {
-        $this->requireRoles(['ADMIN', 'AUDITOR']);
-        $users = User::getAll();
+        $currentUser = $this->requireAuth();
+
+        $locId = null;
+        if ($currentUser['role'] !== 'ADMIN' && $currentUser['role'] !== 'AUDITOR' && !empty($currentUser['location_id'])) {
+            $locId = (int)$currentUser['location_id'];
+        }
+
+        $users = User::getAll($locId);
+
+        foreach ($users as &$u) {
+            $u['raw_id'] = (int)$u['id'];
+            $u['id'] = UrlSecurity::encrypt($u['id']);
+            $u['is_active'] = ($u['status'] === 'ACTIVE');
+        }
+
         $this->json([
             'success' => true,
             'users'   => $users

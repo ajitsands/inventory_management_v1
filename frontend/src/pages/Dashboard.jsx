@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/common/DataTable';
 import { formatDate } from '../utils/date';
 import { formatCurrency } from '../utils/currency';
@@ -11,32 +12,43 @@ import {
   TrendingUp,
   AlertTriangle,
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  RotateCcw,
+  Users
 } from 'lucide-react';
 import { MOVEMENT_BADGES } from '../theme/colors';
 
 export default function Dashboard({ setActiveTab }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [valuation, setValuation] = useState([]);
   const [recentMovements, setRecentMovements] = useState([]);
   const [expiryAlerts, setExpiryAlerts] = useState([]);
+  const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [settings, setSettings] = useState({ currency_code: 'BHD', decimal_places: '3' });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [valRes, movRes, expRes, settingsRes] = await Promise.all([
+        const [valRes, movRes, expRes, settingsRes, usersRes] = await Promise.all([
           apiFetch('/reports/valuation'),
           apiFetch('/reports/movement-ledger'),
           apiFetch('/reports/expiry-alerts'),
-          apiFetch('/settings')
+          apiFetch('/settings'),
+          apiFetch('/users').catch(() => ({ users: [] }))
         ]);
 
-        setValuation(valRes.valuation || []);
-        setRecentMovements(movRes.movements || []);
-        setExpiryAlerts(expRes.alerts || []);
-        if (settingsRes.settings) {
+        setValuation(valRes?.valuation || []);
+        setRecentMovements(movRes?.movements || []);
+        setExpiryAlerts(expRes?.alerts || []);
+        if (settingsRes?.settings) {
           setSettings(settingsRes.settings);
+        }
+        if (usersRes?.users) {
+          const activeCount = usersRes.users.filter(u => u.status === 'ACTIVE' || u.is_active === true || String(u.is_active) === '1').length;
+          setActiveUsersCount(activeCount || usersRes.users.length);
         }
       } catch (err) {
         console.error(err);
@@ -64,10 +76,18 @@ export default function Dashboard({ setActiveTab }) {
       header: 'Type',
       accessor: 'transaction_type',
       render: (m) => {
-        const type = (!m.transaction_type && m.reference_no?.startsWith('RET-')) ? 'STOCK_RETURN' : m.transaction_type;
-        const badge = MOVEMENT_BADGES[type] || { label: type || 'Unknown', color: 'text-slate-600 bg-slate-100' };
+        let type = m.transaction_type;
+        if (!type && m.reference_no?.startsWith('RET-')) {
+          type = 'STOCK_RETURN';
+        } else if (!type && m.reference_no?.startsWith('REJ-RESTORE-')) {
+          type = 'STOCK_RESTORE_IN';
+        }
+        const badge = MOVEMENT_BADGES[type] || { 
+          label: (type || 'Stock Movement').replace(/_/g, ' '), 
+          color: 'text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-800 border-slate-300' 
+        };
         return (
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
+          <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${badge.color}`}>
             {badge.label}
           </span>
         );
@@ -142,12 +162,14 @@ export default function Dashboard({ setActiveTab }) {
             </div>
           </div>
           <div className="space-y-1">
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Getting Price (Cost Valuation)</span>
-              <p className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                {formatCurrency(totalOrgCostValuation, currencyCode, decimalPlaces)}
-              </p>
-            </div>
+            {isAdmin && (
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Getting Price (Cost Valuation)</span>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {formatCurrency(totalOrgCostValuation, currencyCode, decimalPlaces)}
+                </p>
+              </div>
+            )}
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Selling Price Valuation</span>
               <p className="text-base font-black text-brand-blue dark:text-blue-400 font-mono">
@@ -159,16 +181,16 @@ export default function Dashboard({ setActiveTab }) {
 
         <div className="bg-white dark:bg-slate-900 glass-panel p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
           <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Active Batches</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Active Users</span>
             <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
-              <Boxes className="w-4 h-4" />
+              <Users className="w-4 h-4" />
             </div>
           </div>
           <div>
             <p className="text-2xl font-black text-slate-900 dark:text-slate-100 font-heading">
-              {totalBatches}
+              {activeUsersCount} <span className="text-sm font-semibold text-slate-500 font-sans">Users</span>
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Batch Code Price Control Active</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Authorized Active Accounts</p>
           </div>
         </div>
 
@@ -237,22 +259,36 @@ export default function Dashboard({ setActiveTab }) {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-xs pt-1">
-                <div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Units</p>
-                  <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{loc.total_units || 0} <span className="text-xs font-normal">units</span></p>
+              <div className="space-y-2.5 text-xs pt-1">
+                <div className={`grid gap-2 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  <div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Units</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{loc.total_units || 0} <span className="text-[10px] font-normal text-slate-400">units</span></p>
+                  </div>
+                  {isAdmin && (
+                    <div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Getting Price (Cost)</p>
+                      <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                        {formatCurrency(loc.total_cost_valuation, currencyCode, decimalPlaces)}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Selling Price</p>
+                    <p className="font-bold text-brand-blue dark:text-blue-400 font-mono text-sm">
+                      {formatCurrency(loc.total_sales_valuation, currencyCode, decimalPlaces)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Getting Price (Cost)</p>
-                  <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
-                    {formatCurrency(loc.total_cost_valuation, currencyCode, decimalPlaces)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Selling Price</p>
-                  <p className="font-bold text-brand-blue dark:text-blue-400 font-mono text-sm">
-                    {formatCurrency(loc.total_sales_valuation, currencyCode, decimalPlaces)}
-                  </p>
+
+                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <RotateCcw className="w-3 h-3 text-brand-orange" />
+                    Returned Received:
+                  </span>
+                  <span className="font-mono text-xs font-bold text-brand-orange">
+                    {loc.returned_units || 0} units ({formatCurrency(loc.returned_value || 0, currencyCode, decimalPlaces)})
+                  </span>
                 </div>
               </div>
             </div>

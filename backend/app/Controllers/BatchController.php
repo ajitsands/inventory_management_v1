@@ -44,20 +44,17 @@ class BatchController extends Controller {
             $batches = ItemBatch::getBatchesByLocation($targetLocId > 0 ? $targetLocId : 1);
         }
 
-        $encrypted = array_map(function($b) {
-            $rawStockId = (int)$b['stock_id'];
-            $rawBatchId = (int)($b['batch_id'] ?? $rawStockId);
-            $b['raw_id'] = $rawStockId;
-            $b['id'] = UrlSecurity::encrypt($rawStockId);
-            $b['raw_batch_id'] = $rawBatchId;
-            $b['batch_id'] = UrlSecurity::encrypt($rawBatchId);
+        $formatted = array_map(function($b) {
             $b['vendor_name'] = $b['vendor_name'] ?? 'N/A';
+            // We just set standard keys and let Controller::json handle encryption
+            $b['id'] = $b['stock_id'];
+            $b['batch_id'] = $b['batch_id'] ?? $b['stock_id'];
             return $b;
         }, $batches);
 
         $this->json([
             'success' => true,
-            'batches' => $encrypted
+            'batches' => $formatted
         ]);
     }
 
@@ -68,15 +65,11 @@ class BatchController extends Controller {
         $vendors = Vendor::getAll();
         $items = Item::getAll();
 
-        $encLocations = array_map(function($l) { $l['raw_id'] = (int)$l['id']; $l['id'] = UrlSecurity::encrypt($l['id']); return $l; }, $locations);
-        $encVendors = array_map(function($v) { $v['raw_id'] = (int)$v['id']; $v['id'] = UrlSecurity::encrypt($v['id']); return $v; }, $vendors);
-        $encItems = array_map(function($i) { $i['raw_id'] = (int)$i['id']; $i['id'] = UrlSecurity::encrypt($i['id']); return $i; }, $items);
-
         $this->json([
             'success'   => true,
-            'locations' => $encLocations,
-            'vendors'   => $encVendors,
-            'items'     => $encItems
+            'locations' => $locations,
+            'vendors'   => $vendors,
+            'items'     => $items
         ]);
     }
 

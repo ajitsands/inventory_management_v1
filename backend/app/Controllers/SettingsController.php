@@ -96,4 +96,62 @@ class SettingsController extends Controller
             'sequences' => SequenceService::getSequences()
         ]);
     }
+
+    public function clearTransactionalData()
+    {
+        $user = $this->requireAuth();
+        if ($user['role'] !== 'ADMIN') {
+            $this->json(['error' => 'Admin authorization required.'], 403);
+            return;
+        }
+
+        $pdo = Model::getDB();
+
+        try {
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+            $tables = [
+                'branch_payments',
+                'credit_note_items',
+                'credit_notes',
+                'damaged_stock',
+                'invoice_payment_records',
+                'location_batch_stock',
+                'purchase_invoice_items',
+                'purchase_invoices',
+                'sales_invoice_items',
+                'sales_invoices',
+                'stock_movements_ledger',
+                'stock_return_items',
+                'stock_return_rejections',
+                'stock_return_wallets',
+                'stock_returns',
+                'stock_transfer_items',
+                'stock_transfers',
+                'system_audit_trail',
+                'vendor_quotation_items',
+                'vendor_quotations',
+                'item_batches'
+            ];
+
+            foreach ($tables as $table) {
+                $pdo->exec("TRUNCATE TABLE `$table`");
+            }
+
+            // Reset sequences
+            $pdo->exec("UPDATE system_sequences SET current_val = 0");
+
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
+            AuditLogger::log($user['user_id'], $user['username'], $user['role'], 'SYSTEM_MAINTENANCE', 'CLEAR_TRANSACTIONAL_DATA', null, null);
+
+            $this->json([
+                'success' => true,
+                'message' => 'All transactional data cleared successfully. Master data has been preserved.'
+            ]);
+        } catch (\Exception $e) {
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+            $this->error('Failed to clear transactional data: ' . $e->getMessage(), 500);
+        }
+    }
 }

@@ -4,7 +4,7 @@ import DataTable from '../components/common/DataTable';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { formatDate } from '../utils/date';
 import { formatCurrency } from '../utils/currency';
-import { GitPullRequest, Plus, Trash2, CheckCircle2, AlertCircle, Building2, HelpCircle, X, DollarSign, FileText, Calendar, Wallet, Receipt, Filter, History, ArrowRight, BookOpen, Landmark, CreditCard } from 'lucide-react';
+import { GitPullRequest, Plus, Trash2, CheckCircle2, AlertCircle, Building2, HelpCircle, X, DollarSign, FileText, Calendar, Wallet, Receipt, Filter, History, ArrowRight, BookOpen, Landmark, CreditCard, Download } from 'lucide-react';
 
 function getFirstDayOfCurrentMonth() {
   const now = new Date();
@@ -59,6 +59,7 @@ export default function SubBranchInvoicing() {
   // Branch Ledger Trajectory Modal State
   const [showBranchLedgerModal, setShowBranchLedgerModal] = useState(false);
   const [branchLedgerTab, setBranchLedgerTab] = useState('invoices'); // 'invoices' | 'movements'
+  const [historyPaymentTab, setHistoryPaymentTab] = useState('unpaid'); // 'unpaid' | 'paid'
 
   const handlePresetThisMonth = () => {
     setStartDateFilter(getFirstDayOfCurrentMonth());
@@ -78,6 +79,66 @@ export default function SubBranchInvoicing() {
   const handlePresetAllTime = () => {
     setStartDateFilter('');
     setEndDateFilter('');
+  };
+
+  const handleExportToExcel = () => {
+    const dataToExport = historyPaymentTab === 'unpaid' ? unpaidTransfers : paidTransfers;
+    const tabName = historyPaymentTab === 'unpaid' ? 'Unpaid_Partial_Invoices' : 'Fully_Paid_Invoices';
+
+    if (!dataToExport || dataToExport.length === 0) {
+      alert('No sub-branch invoice data available to export for the current filter.');
+      return;
+    }
+
+    const dateFormat = settings.date_format || 'DD/MM/YYYY';
+    const currencyCode = settings.currency_code || 'BHD';
+    const decimalPlaces = parseInt(settings.decimal_places || '3');
+
+    const headers = [
+      'Invoice / Transfer #',
+      'Sub-Branch Location',
+      'Dispatch Date',
+      `Net Subtotal (${currencyCode})`,
+      `VAT Tax (${currencyCode})`,
+      `Grand Total (${currencyCode})`,
+      `Payment Received (${currencyCode})`,
+      `Pending Balance (${currencyCode})`,
+      'Payment Status'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    dataToExport.forEach(t => {
+      const invNo = `"${(t.invoice_no || t.transfer_no || '').replace(/"/g, '""')}"`;
+      const branchName = `"${(t.to_location_name || '').replace(/"/g, '""')}"`;
+      const dispatchDate = `"${formatDate(t.dispatched_at, dateFormat)}"`;
+      const grand = parseFloat(t.total_val || 0);
+      const sub = parseFloat(t.subtotal || (grand / 1.10));
+      const vat = parseFloat(t.vat_amount || (grand - sub));
+      const paid = parseFloat(t.paid_amount ?? t.total_val);
+      const pending = parseFloat(t.pending_balance || 0);
+      const status = `"${t.payment_status || (pending > 0 ? 'PARTIAL' : 'PAID')}"`;
+
+      csvRows.push([
+        invNo,
+        branchName,
+        dispatchDate,
+        sub.toFixed(decimalPlaces),
+        vat.toFixed(decimalPlaces),
+        grand.toFixed(decimalPlaces),
+        paid.toFixed(decimalPlaces),
+        pending.toFixed(decimalPlaces),
+        status
+      ].join(','));
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csvRows.join('\n'));
+    const link = document.createElement('a');
+    link.setAttribute('href', csvContent);
+    link.setAttribute('download', `Sub_Branch_${tabName}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   function createEmptyLine() {
@@ -348,10 +409,24 @@ export default function SubBranchInvoicing() {
   const branchInvoicedTransfers = transfers.filter(t => t.transfer_type === 'BRANCH_INVOICED');
 
   const branchFilteredTransfers = branchInvoicedTransfers.filter(t => {
-    if (selectedBranchFilter === 'ALL') return true;
+    if (!selectedBranchFilter || selectedBranchFilter === 'ALL') return true;
+
+    const targetLocObj = subBranches.find(b => 
+      String(b.id) === String(selectedBranchFilter) || 
+      String(b.raw_id) === String(selectedBranchFilter)
+    );
+
+    const targetRawId = targetLocObj?.raw_id ? String(targetLocObj.raw_id) : String(selectedBranchFilter);
+    const targetEncId = targetLocObj?.id ? String(targetLocObj.id) : String(selectedBranchFilter);
+
+    const tRawId = t.raw_to_location_id ? String(t.raw_to_location_id) : String(t.to_location_id || '');
+    const tEncId = String(t.to_location_id || '');
+
     return (
-      String(t.to_location_id) === String(selectedBranchFilter) ||
-      String(t.raw_to_location_id) === String(selectedBranchFilter)
+      tRawId === targetRawId ||
+      tEncId === targetEncId ||
+      tRawId === targetEncId ||
+      tEncId === targetRawId
     );
   });
 
@@ -402,6 +477,10 @@ export default function SubBranchInvoicing() {
 
   // Net Total Outstanding Balance = Carry Forward Pending + Current Period Pending
   const netTotalOutstanding = carryForwardMetrics.totalPending + summaryMetrics.totalPending;
+
+  // Split history into Unpaid & Partial vs Fully Paid
+  const unpaidTransfers = filteredTransfers.filter(t => t.payment_status === 'UNPAID' || t.payment_status === 'PARTIAL' || parseFloat(t.pending_balance || 0) > 0);
+  const paidTransfers = filteredTransfers.filter(t => t.payment_status === 'PAID' || (parseFloat(t.pending_balance || 0) <= 0 && t.payment_status !== 'UNPAID' && t.payment_status !== 'PARTIAL'));
 
   const destinationBranchObj = subBranches.find(b => b.id === toLocationId || b.raw_id == toLocationId);
   const selectedBranchObj = subBranches.find(b => b.id === selectedBranchFilter || b.raw_id == selectedBranchFilter);
@@ -1754,15 +1833,174 @@ export default function SubBranchInvoicing() {
         </div>
       )}
 
-      {/* History Table */}
-      <DataTable
-        title={`Sub-Branch Invoices & Transfers History (${selectedBranchFilter === 'ALL' ? 'All Sub-Branches' : destinationBranchObj?.name || 'Selected Sub-Branch'})`}
-        subtitle={`Audit and review all branch transfers, separated VAT tax, payment received & pending balance in ${currencyCode}`}
-        columns={transferColumns}
-        data={filteredTransfers}
-        searchable={true}
-        defaultPageSize={10}
-      />
+      {/* Sub-Branch & Date Range Filter Toolbar with Excel Export */}
+      <div className="bg-white dark:bg-slate-900 glass-panel p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-brand-blue/10 dark:bg-brand-blue/20 text-brand-blue rounded-2xl border border-brand-blue/20">
+              <Filter className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading uppercase tracking-wider">
+                Sub-Branch History Filters & Excel Export
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Filter invoice history by Date Range & Sub-Branch Location, then export active tab to Excel (.csv)
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportToExcel}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md glow-blue hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer font-heading self-start md:self-auto"
+            title="Export active tab's invoice history to Excel CSV"
+          >
+            <Download className="w-4 h-4" />
+            Export Active Tab to Excel (.csv)
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          {/* Sub-Branch Location Filter */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-brand-blue" />
+              Sub-Branch Location:
+            </label>
+            <select
+              value={selectedBranchFilter}
+              onChange={(e) => setSelectedBranchFilter(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 dark:text-slate-100 focus:border-brand-blue focus:outline-none"
+            >
+              <option value="ALL">All Sub-Branches</option>
+              {subBranches.map(b => (
+                <option key={b.id} value={b.raw_id || b.id}>
+                  {b.name} ({b.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-purple-500" />
+              From Date:
+            </label>
+            <input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:border-brand-blue focus:outline-none"
+            />
+          </div>
+
+          {/* End Date */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-purple-500" />
+              To Date:
+            </label>
+            <input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:border-brand-blue focus:outline-none"
+            />
+          </div>
+
+          {/* Quick Date Range Presets */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Quick Presets:
+            </label>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handlePresetThisMonth}
+                className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  startDateFilter === getFirstDayOfCurrentMonth() && endDateFilter === getLastDayOfCurrentMonth()
+                    ? 'bg-brand-blue text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={handlePresetLastMonth}
+                className="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
+              >
+                Last Month
+              </button>
+              <button
+                type="button"
+                onClick={handlePresetAllTime}
+                className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  !startDateFilter && !endDateFilter
+                    ? 'bg-brand-blue text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                All Time
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* History DataTable Section with 2 Sub-Tabs */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-900 glass-panel p-3 rounded-2xl border border-slate-200 dark:border-slate-800 gap-3 shadow-xs">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setHistoryPaymentTab('unpaid')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+                historyPaymentTab === 'unpaid'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <DollarSign className="w-4 h-4" />
+              Unpaid & Partial Paid ({unpaidTransfers.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHistoryPaymentTab('paid')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+                historyPaymentTab === 'paid'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Fully Paid ({paidTransfers.length})
+            </button>
+          </div>
+
+          <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Active Filter: <span className="font-extrabold text-slate-800 dark:text-slate-200">{historyPaymentTab === 'unpaid' ? `${unpaidTransfers.length} Outstanding Invoices` : `${paidTransfers.length} Settled Invoices`}</span>
+          </div>
+        </div>
+
+        <DataTable
+          title={historyPaymentTab === 'unpaid' 
+            ? `Unpaid & Partial Paid Invoices (${selectedBranchFilter === 'ALL' ? 'All Sub-Branches' : destinationBranchObj?.name || 'Selected Sub-Branch'})`
+            : `Fully Paid Invoices (${selectedBranchFilter === 'ALL' ? 'All Sub-Branches' : destinationBranchObj?.name || 'Selected Sub-Branch'})`
+          }
+          subtitle={historyPaymentTab === 'unpaid' 
+            ? `Audit and manage outstanding unpaid & partial paid sub-branch transfer invoices with pending balance in ${currencyCode}`
+            : `Archive of fully settled & zero pending balance sub-branch transfer invoices in ${currencyCode}`
+          }
+          columns={transferColumns}
+          data={historyPaymentTab === 'unpaid' ? unpaidTransfers : paidTransfers}
+          searchable={true}
+          defaultPageSize={10}
+        />
+      </div>
     </div>
   );
 }

@@ -10,13 +10,16 @@ export default function DataTable({
   title,
   subtitle,
   actions,
-  minHeight = "min-h-[400px]"
+  minHeight = "min-h-[400px]",
+  renderSubRow,
+  footer
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
+
 
   // 1. Search Filtering
   const filteredData = useMemo(() => {
@@ -147,16 +150,20 @@ export default function DataTable({
               </tr>
             ) : (
               paginatedData.map((row, rowIdx) => (
-                <tr key={row.id || rowIdx} className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
-                  {columns.map((col, colIdx) => (
-                    <td key={colIdx} className={`p-3.5 text-slate-800 dark:text-slate-200 font-medium ${col.className || ''}`}>
-                      {col.render ? col.render(row, rowIdx) : (typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor])}
-                    </td>
-                  ))}
-                </tr>
+                <React.Fragment key={row.raw_id || row.id || rowIdx}>
+                  <tr className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                    {columns.map((col, colIdx) => (
+                      <td key={colIdx} className={`p-3.5 text-slate-800 dark:text-slate-200 font-medium ${col.className || ''}`}>
+                        {col.render ? col.render(row, rowIdx) : (typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor])}
+                      </td>
+                    ))}
+                  </tr>
+                  {renderSubRow && renderSubRow(row, rowIdx)}
+                </React.Fragment>
               ))
             )}
           </tbody>
+          {footer}
         </table>
       </div>
 

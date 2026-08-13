@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/common/DataTable';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { formatDate } from '../utils/date';
@@ -29,6 +30,12 @@ import {
 } from 'lucide-react';
 
 export default function BatchInventory() {
+  const { user } = useAuth();
+  const role = user?.role || 'AUDITOR';
+  const isAdmin = role === 'ADMIN';
+  const isAdminOrAuditor = ['ADMIN', 'AUDITOR'].includes(role);
+  const userLocId = user?.raw_location_id || user?.location_id;
+
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [batches, setBatches] = useState([]);
@@ -76,18 +83,31 @@ export default function BatchInventory() {
   useEffect(() => {
     async function init() {
       try {
-        const [master, settingsRes] = await Promise.all([
-          apiFetch('/master-data'),
+        const [locRes, settingsRes] = await Promise.all([
+          apiFetch('/locations'),
           apiFetch('/settings')
         ]);
-        const locs = master.locations || [];
+        const locs = locRes.locations || [];
         setLocations(locs);
         if (settingsRes.settings) {
           setSettings(settingsRes.settings);
         }
-        // Default to All Branches Combined (location 0)
-        setSelectedLocation(0);
-        fetchStock(0);
+
+        // Scope location for non-Admin users (Clinic & Sub-Branch users)
+        if (!isAdminOrAuditor) {
+          const userLoc = locs.find(l => 
+            (l.raw_id && userLocId && l.raw_id == userLocId) ||
+            (l.id && userLocId && l.id === userLocId) ||
+            (l.name && user?.location_name && l.name === user.location_name)
+          );
+          const initialLocId = userLoc ? userLoc.id : (userLocId || 0);
+          setSelectedLocation(initialLocId);
+          fetchStock(initialLocId);
+        } else {
+          // Default for Admin / Auditor: All Branches Combined
+          setSelectedLocation(0);
+          fetchStock(0);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -95,7 +115,7 @@ export default function BatchInventory() {
       }
     }
     init();
-  }, []);
+  }, [isAdminOrAuditor, userLocId]);
 
   const currencyCode = settings.currency_code || 'BHD';
   const decimalPlaces = settings.decimal_places;
@@ -163,11 +183,11 @@ export default function BatchInventory() {
       accessor: 'vendor_name',
       render: (b) => <span className="text-slate-700 dark:text-slate-300 font-medium">{b.vendor_name || 'N/A'}</span>
     },
-    {
+    ...(isAdmin ? [{
       header: `Cost Price (${currencyCode})`,
       accessor: 'purchase_price',
       render: (b) => <span className="text-slate-700 dark:text-slate-300 font-mono">{formatCurrency(b.purchase_price, currencyCode, decimalPlaces)}</span>
-    },
+    }] : []),
     {
       header: `Sales Price (${currencyCode})`,
       accessor: 'selling_price',
@@ -272,13 +292,14 @@ export default function BatchInventory() {
         <div className="flex items-center space-x-2 w-80">
           <Building2 className="w-4 h-4 text-brand-blue shrink-0" />
           <SearchableSelect
+            disabled={!isAdminOrAuditor}
             placeholder="Search Location..."
-            options={[
+            options={isAdminOrAuditor ? [
               { value: 0, label: '🌐 All Branches Combined', sublabel: 'Sum of stock across every location' },
               ...locations.map(l => ({ value: l.raw_id || l.id, label: `${l.name} (${l.type})`, sublabel: `Location Code: ${l.code}` }))
-            ]}
+            ] : locations.map(l => ({ value: l.id, label: `${l.name} (${l.type})`, sublabel: `Location Code: ${l.code}` }))}
             value={selectedLocation}
-            onChange={(val) => handleLocationChange(val)}
+            onChange={(val) => isAdminOrAuditor && handleLocationChange(val)}
           />
         </div>
       </div>
@@ -417,9 +438,10 @@ export default function BatchInventory() {
                       <span className="font-bold text-slate-800 dark:text-slate-200">{timelineData.batch_info.vendor_name}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Cost Price / Sales Price</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">{isAdmin ? 'Cost Price / Sales Price' : 'Selling Price (MRP)'}</span>
                       <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {formatCurrency(timelineData.batch_info.purchase_price, currencyCode, decimalPlaces)} / <span className="text-emerald-600">{formatCurrency(timelineData.batch_info.selling_price, currencyCode, decimalPlaces)}</span>
+                        {isAdmin && <>{formatCurrency(timelineData.batch_info.purchase_price, currencyCode, decimalPlaces)} / </>}
+                        <span className="text-emerald-600">{formatCurrency(timelineData.batch_info.selling_price, currencyCode, decimalPlaces)}</span>
                       </span>
                     </div>
                     <div>

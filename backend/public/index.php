@@ -55,6 +55,7 @@ $router->post('/api/v1/doctors/update', ['DoctorController', 'update']);
 $router->get('/api/v1/settings', ['SettingsController', 'index']);
 $router->post('/api/v1/settings', ['SettingsController', 'updateSettings']);
 $router->post('/api/v1/settings/sequences', ['SettingsController', 'updateSequences']);
+$router->post('/api/v1/settings/clear-transactions', ['SettingsController', 'clearTransactionalData']);
 
 // Vendor Quotations & PO Routes
 $router->get('/api/v1/quotations', ['QuotationController', 'index']);
@@ -91,12 +92,15 @@ $router->get('/api/v1/returns/reject-wallet', ['ReturnController', 'getClinicRej
 $router->post('/api/v1/returns/restore-reject', ['ReturnController', 'restoreRejectStock']);
 $router->get('/api/v1/returns/credit-notes', ['ReturnController', 'getCreditNotes']);
 $router->get('/api/v1/returns/damaged-stock', ['ReturnController', 'getDamagedStock']);
+$router->get('/api/v1/returns/vendor-returns', ['ReturnController', 'getVendorReturns']);
 
 // Audit & Report Routes
 $router->get('/api/v1/audit/logs', ['AuditController', 'getLogs']);
 $router->get('/api/v1/reports/movement-ledger', ['ReportController', 'getMovementLedger']);
 $router->get('/api/v1/reports/expiry-alerts', ['ReportController', 'getExpiryAlerts']);
 $router->get('/api/v1/reports/valuation', ['ReportController', 'getValuation']);
+$router->get('/api/v1/reports/consolidated-item-valuation', ['ReportController', 'getConsolidatedItemValuation']);
+$router->get('/api/v1/reports/consolidated-invoices', ['ReportController', 'getConsolidatedInvoices']);
 
 // Dispatch Request
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

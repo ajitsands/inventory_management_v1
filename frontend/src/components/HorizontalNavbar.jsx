@@ -12,7 +12,8 @@ import {
   Stethoscope,
   FileSpreadsheet,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function HorizontalNavbar({ activeTab, setActiveTab }) {
@@ -37,15 +38,16 @@ export default function HorizontalNavbar({ activeTab, setActiveTab }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const userLocId = user?.location_id || user?.raw_location_id;
+  const userLocId = user?.raw_location_id || user?.location_id;
   const isGlobalOrMainAdmin = (role === 'ADMIN') || (!userLocId || userLocId == 1);
 
   const isMastersActive = activeTab === 'items' || activeTab === 'master-data';
-  const isReportsActive = activeTab === 'batches' || activeTab === 'reports';
+  const isReportsActive = activeTab === 'batches' || activeTab === 'reports' || activeTab === 'consolidated-report' || activeTab === 'invoices-report';
   const canSeeMasters = isGlobalOrMainAdmin && ['ADMIN', 'STORE_MANAGER'].includes(role);
   const canSeeMainStorePurchase = isGlobalOrMainAdmin && ['ADMIN', 'STORE_MANAGER'].includes(role);
   const canSeeSubBranchInvoicing = isGlobalOrMainAdmin && ['ADMIN', 'STORE_MANAGER'].includes(role);
-  const canSeeClinicTransfer = ['ADMIN', 'STORE_MANAGER'].includes(role);
+  const canSeeClinicTransfer = role === 'STORE_MANAGER';
+  const canSeeOPDDispensing = role === 'OPD_USER';
   const canSeeStockReturns = ['ADMIN', 'STORE_MANAGER', 'OPD_USER'].includes(role);
   const canSeeReports = ['ADMIN', 'STORE_MANAGER', 'OPD_USER', 'AUDITOR'].includes(role);
 
@@ -190,17 +192,19 @@ export default function HorizontalNavbar({ activeTab, setActiveTab }) {
         )}
 
         {/* 7. OPD Dispensing (FIFO) */}
-        <button
-          onClick={() => { setActiveTab('opd-sales'); setMastersOpen(false); setReportsOpen(false); }}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-            activeTab === 'opd-sales'
-              ? 'bg-gradient-to-r from-[#1C8DCD] to-[#146ca1] text-white shadow-md glow-blue font-bold'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-          }`}
-        >
-          <Stethoscope className={`w-4 h-4 ${activeTab === 'opd-sales' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
-          <span>OPD Dispensing (FIFO)</span>
-        </button>
+        {canSeeOPDDispensing && (
+          <button
+            onClick={() => { setActiveTab('opd-sales'); setMastersOpen(false); setReportsOpen(false); }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'opd-sales'
+                ? 'bg-gradient-to-r from-[#1C8DCD] to-[#146ca1] text-white shadow-md glow-blue font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80'
+            }`}
+          >
+            <Stethoscope className={`w-4 h-4 ${activeTab === 'opd-sales' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+            <span>OPD Dispensing (FIFO)</span>
+          </button>
+        )}
 
         {/* 8. Stock Returns */}
         {canSeeStockReturns && (
@@ -260,6 +264,24 @@ export default function HorizontalNavbar({ activeTab, setActiveTab }) {
 
                 <button
                   type="button"
+                  onClick={() => { setActiveTab('invoices-report'); setReportsOpen(false); }}
+                  className={`w-full flex items-center space-x-3 px-4 py-2.5 text-xs text-left font-medium transition-all ${
+                    activeTab === 'invoices-report'
+                      ? 'bg-brand-blue/10 text-brand-blue font-bold dark:bg-brand-blue/20'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/70'
+                  }`}
+                >
+                  <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/80 text-brand-blue">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block font-bold">Consolidated Invoices Report</span>
+                    <span className="text-[10px] text-slate-400">Branch invoices, credit notes & balances</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => { setActiveTab('reports'); setReportsOpen(false); }}
                   className={`w-full flex items-center space-x-3 px-4 py-2.5 text-xs text-left font-medium transition-all ${
                     activeTab === 'reports'
@@ -275,10 +297,31 @@ export default function HorizontalNavbar({ activeTab, setActiveTab }) {
                     <span className="text-[10px] text-slate-400">Stock trajectory ledger & location valuation</span>
                   </div>
                 </button>
+
+                {role === 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('consolidated-report'); setReportsOpen(false); }}
+                    className={`w-full flex items-center space-x-3 px-4 py-2.5 text-xs text-left font-medium transition-all ${
+                      activeTab === 'consolidated-report'
+                        ? 'bg-brand-blue/10 text-brand-blue font-bold dark:bg-brand-blue/20'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/70'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/80 text-cyan-600 dark:text-cyan-400">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-bold">Item Consolidated Valuation</span>
+                      <span className="text-[10px] text-slate-400">Multi-category stock totals by location (Admin)</span>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>
         )}
+
       </div>
     </nav>
   );

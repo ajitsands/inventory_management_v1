@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { formatDate } from '../utils/date';
-import { Settings, Save, CheckCircle2, AlertCircle, Globe, Percent, Hash, Calculator } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle, Globe, Percent, Hash, Calculator, Trash2, AlertTriangle } from 'lucide-react';
 
 export default function StoreSettings() {
   const [settings, setSettings] = useState({
@@ -23,6 +23,8 @@ export default function StoreSettings() {
   const [loading, setLoading] = useState(true);
   const [submittingSettings, setSubmittingSettings] = useState(false);
   const [submittingSequences, setSubmittingSequences] = useState(false);
+  const [clearingTransactions, setClearingTransactions] = useState(false);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [message, setMessage] = useState(null);
 
   const loadData = async () => {
@@ -80,6 +82,25 @@ export default function StoreSettings() {
       setMessage({ type: 'error', text: err.message || 'Failed to update sequence formats' });
     } finally {
       setSubmittingSequences(false);
+    }
+  };
+
+  const handleClearTransactions = async () => {
+    setClearingTransactions(true);
+    setMessage(null);
+    try {
+      const res = await apiFetch('/settings/clear-transactions', {
+        method: 'POST'
+      });
+      if (res.success) {
+        setMessage({ type: 'success', text: res.message });
+        setShowConfirmClear(false);
+        loadData();
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to clear transactional data' });
+    } finally {
+      setClearingTransactions(false);
     }
   };
 
@@ -388,6 +409,58 @@ export default function StoreSettings() {
           </button>
         </div>
       </form>
+
+      {/* 3. System Maintenance & Reset */}
+      <div className="bg-rose-50 dark:bg-rose-950/20 p-6 rounded-3xl border border-rose-200 dark:border-rose-800/60 space-y-4 shadow-xs mt-6">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-xs font-bold text-rose-800 dark:text-rose-200 uppercase tracking-wider">
+              Danger Zone: System Reset & Maintenance
+            </h3>
+            <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
+              Wipe all transactional database history (Stock Invoices, Sales Invoices, Stock Transfers, Returns, Batches, Movements, and Audit Logs). 
+              <strong> All Master Data (Items, Locations, Vendors, Users, settings) will be fully preserved.</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          {!showConfirmClear ? (
+            <button
+              type="button"
+              onClick={() => setShowConfirmClear(true)}
+              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+            >
+              <Trash2 className="w-4 h-4" /> Clear All Transactional Data
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 p-3 rounded-2xl animate-in fade-in zoom-in duration-150">
+              <span className="text-[11px] text-rose-700 dark:text-rose-300 font-extrabold">
+                Are you absolutely sure? This will permanently delete all stock levels and invoice histories!
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleClearTransactions}
+                  disabled={clearingTransactions}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50"
+                >
+                  {clearingTransactions ? 'Wiping...' : 'Yes, Delete Everything'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmClear(false)}
+                  disabled={clearingTransactions}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

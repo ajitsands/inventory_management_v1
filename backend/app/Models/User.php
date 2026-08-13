@@ -5,7 +5,8 @@ class User extends Model {
 
     public static function findByUsername(string $username) {
         $pdo = self::getDB();
-        $stmt = $pdo->prepare("SELECT u.*, l.name AS location_name, l.code AS location_code, l.type AS location_type 
+        $stmt = $pdo->prepare("SELECT u.id, u.username, u.password_hash, u.full_name, u.email, u.role, u.location_id, u.location_id AS raw_location_id, u.status, u.created_at,
+                               l.name AS location_name, l.code AS location_code, l.type AS location_type 
                                FROM `users` u 
                                LEFT JOIN `locations` l ON u.location_id = l.id 
                                WHERE u.username = ? AND u.status = 'ACTIVE'");
@@ -15,7 +16,7 @@ class User extends Model {
 
     public static function findById(int $id) {
         $pdo = self::getDB();
-        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, u.email, u.role, u.location_id, u.status, u.created_at,
+        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, u.email, u.role, u.location_id, u.location_id AS raw_location_id, u.status, u.created_at,
                                l.name AS location_name, l.code AS location_code, l.type AS location_type 
                                FROM `users` u 
                                LEFT JOIN `locations` l ON u.location_id = l.id 
@@ -24,14 +25,25 @@ class User extends Model {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    public static function getAll() {
+    public static function getAll(?int $locationId = null) {
         $pdo = self::getDB();
-        $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.role, u.location_id, u.status, u.created_at,
-                                    l.name AS location_name, l.type AS location_type
-                             FROM `users` u 
-                             LEFT JOIN `locations` l ON u.location_id = l.id 
-                             ORDER BY u.id ASC");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($locationId !== null && $locationId > 0) {
+            $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, u.email, u.role, u.location_id, u.location_id AS raw_location_id, u.status, u.created_at,
+                                         l.name AS location_name, l.type AS location_type
+                                  FROM `users` u 
+                                  LEFT JOIN `locations` l ON u.location_id = l.id 
+                                  WHERE u.location_id = ?
+                                  ORDER BY u.id ASC");
+            $stmt->execute([$locationId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.role, u.location_id, u.location_id AS raw_location_id, u.status, u.created_at,
+                                         l.name AS location_name, l.type AS location_type
+                                  FROM `users` u 
+                                  LEFT JOIN `locations` l ON u.location_id = l.id 
+                                  ORDER BY u.id ASC");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 
     public static function create(array $data) {

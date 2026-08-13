@@ -33,7 +33,7 @@ export default function ClinicStockTransfer() {
       setSubBranches(subs);
       setClinics(clns);
 
-      const userLocId = user?.location_id || user?.raw_location_id;
+      const userLocId = user?.raw_location_id || user?.location_id;
       const mySubBranch = subs.find(s => s.id == userLocId || s.raw_id == userLocId);
 
       if (mySubBranch) {

@@ -17,14 +17,21 @@ class ReturnController extends Controller
         $user = $this->requireAuth();
         $pdo = Model::getDB();
 
-        // Always use the authenticated user's location_id for non-ADMIN users
-        // For ADMIN, allow location_id query param override
-        if ($user['role'] !== 'ADMIN' && !empty($user['location_id'])) {
+        // Use location parameter if provided, otherwise fallback to authenticated user location_id
+        $rawLocIdParam = $_GET['raw_location_id'] ?? $_GET['location_id'] ?? null;
+        $decryptedLoc = UrlSecurity::decrypt($rawLocIdParam);
+        $paramLocId = (!empty($decryptedLoc) && is_numeric($decryptedLoc)) ? (int)$decryptedLoc : (int)$rawLocIdParam;
+
+        file_put_contents(__DIR__ . '/request_log.txt', date('Y-m-d H:i:s') . " User role: " . $user['role'] . ", raw_location_id GET param: " . $rawLocIdParam . ", decrypted: " . $decryptedLoc . ", paramLocId: " . $paramLocId . "\n", FILE_APPEND);
+
+        if (($user['role'] === 'OPD_USER' || $user['role'] === 'STORE_MANAGER') && !empty($user['location_id'])) {
             $locId = (int)$user['location_id'];
+        } else if ($paramLocId > 0) {
+            $locId = $paramLocId;
         } else {
-            $rawLocId = UrlSecurity::decrypt($_GET['location_id'] ?? null);
-            $locId = !empty($rawLocId) ? (int)$rawLocId : (int)($_GET['raw_location_id'] ?? $_GET['location_id'] ?? 0);
+            $locId = (int)($user['location_id'] ?? 0);
         }
+        file_put_contents('e:/inventory_system/scratch/request_log.txt', "Final locId: " . $locId . "\n", FILE_APPEND);
 
         if (!$locId) {
             $this->error('Location ID is required.', 400);
@@ -34,10 +41,13 @@ class ReturnController extends Controller
         // Fetch current active stock batches at this location from location_batch_stock
         $sql = "SELECT lbs.batch_id, lbs.quantity_available,
                        b.batch_code, b.expiry_date, b.purchase_price AS unit_cost, b.selling_price,
-                       i.id AS item_id, i.name AS item_name, i.item_code, i.unit_of_measure
+                       i.id AS item_id, i.name AS item_name, i.item_code, i.unit_of_measure,
+                       pi.vendor_invoice_no, pi.document_url AS invoice_document_url, pi.invoice_no AS system_purchase_no
                 FROM `location_batch_stock` lbs
                 JOIN `item_batches` b ON lbs.batch_id = b.id
                 JOIN `items` i ON b.item_id = i.id
+                LEFT JOIN `purchase_invoice_items` pii ON pii.batch_id = b.id
+                LEFT JOIN `purchase_invoices` pi ON pii.purchase_invoice_id = pi.id
                 WHERE lbs.location_id = ? AND lbs.quantity_available > 0
                 ORDER BY i.name ASC, b.expiry_date ASC";
 
@@ -63,21 +73,47 @@ class ReturnController extends Controller
             $totalReceived = (int)($transferRow['total_received'] ?? 0);
             $transferFromLocId = $transferRow ? (int)$transferRow['from_location_id'] : null;
 
-            // Calculate quantity already returned or in return process
+            // Fallback: Check stock_movements_ledger if transfer is not logged in stock_transfers
+            if (!$transferFromLocId) {
+                $stmtLedger = $pdo->prepare("SELECT from_location_id, SUM(qty) AS total_received
+                                             FROM `stock_movements_ledger`
+                                             WHERE to_location_id = ? AND batch_id = ? AND transaction_type IN ('CLINIC_TRANSFER', 'BRANCH_TRANSFER') AND from_location_id IS NOT NULL
+                                             GROUP BY from_location_id
+                                             ORDER BY MAX(id) DESC
+                                             LIMIT 1");
+                $stmtLedger->execute([$locId, $batchId]);
+                $ledgerRow = $stmtLedger->fetch(PDO::FETCH_ASSOC);
+                if ($ledgerRow) {
+                    $transferFromLocId = (int)$ledgerRow['from_location_id'];
+                    if ($totalReceived <= 0) {
+                        $totalReceived = (int)($ledgerRow['total_received'] ?? 0);
+                    }
+                }
+            }
+
+            // Calculate quantity currently in-transit return (pending acceptance only)
+            // Only PENDING_ACCEPTANCE returns have already been deducted from stock but not yet processed.
+            // REJECTED/RESTORED/ACCEPTED returns either never deducted stock or stock came back already.
             $stmtRet = $pdo->prepare("SELECT COALESCE(SUM(sri.quantity), 0) AS total_returned
                                      FROM `stock_return_items` sri
                                      JOIN `stock_returns` sr ON sri.return_id = sr.id
-                                     WHERE sr.from_location_id = ? AND sri.batch_id = ? AND sr.status != 'REJECTED'");
+                                     WHERE sr.from_location_id = ? AND sri.batch_id = ? AND sr.status = 'PENDING_ACCEPTANCE'");
             $stmtRet->execute([$locId, $batchId]);
             $retRow = $stmtRet->fetch(PDO::FETCH_ASSOC);
-            $totalReturned = (int)($retRow['total_returned'] ?? 0);
+            $totalInTransit = (int)($retRow['total_returned'] ?? 0);
 
-            // Remaining returnable quantity
+            // Total successfully returned (ACCEPTED, RESTORED — stock permanently left branch)
+            $stmtDone = $pdo->prepare("SELECT COALESCE(SUM(sri.quantity), 0) AS total_done
+                                      FROM `stock_return_items` sri
+                                      JOIN `stock_returns` sr ON sri.return_id = sr.id
+                                      WHERE sr.from_location_id = ? AND sri.batch_id = ? AND sr.status IN ('ACCEPTED','RESTORED')");
+            $stmtDone->execute([$locId, $batchId]);
+            $totalReturnedDone = (int)($stmtDone->fetchColumn() ?? 0);
+
+            // Physical available stock at the location is the hard cap
             $availQty = (int)$b['quantity_available'];
-            $eligibleByTransfer = max(0, $totalReceived - $totalReturned);
-
-            // If transfer history is tracked, limit by eligible; otherwise fallback to availQty
-            $maxReturnable = ($totalReceived > 0) ? min($availQty, $eligibleByTransfer) : $availQty;
+            // Max returnable = current available stock (cannot return more than you physically have)
+            $maxReturnable = $availQty;
 
             $b['raw_id'] = $batchId;
             $b['raw_batch_id'] = $batchId;
@@ -86,8 +122,9 @@ class ReturnController extends Controller
             $b['raw_item_id'] = (int)$b['item_id'];
             $b['item_id'] = (int)$b['raw_item_id'];  // keep raw int
             $b['total_received'] = $totalReceived > 0 ? $totalReceived : $availQty;
-            $b['total_returned'] = $totalReturned;
-            $b['max_returnable_qty'] = $maxReturnable > 0 ? $maxReturnable : $availQty;
+            $b['total_returned'] = $totalReturnedDone;  // permanently left (ACCEPTED/RESTORED)
+            $b['total_in_transit'] = $totalInTransit;   // pending acceptance (already deducted)
+            $b['max_returnable_qty'] = $maxReturnable;
             // Tell frontend which Sub-Branch to auto-select as Destination
             $b['transfer_from_location_id'] = $transferFromLocId;
 
@@ -342,18 +379,24 @@ class ReturnController extends Controller
                 throw new \Exception('This return request has already been processed or closed.');
             }
 
-            $toLocId = (int)$returnRow['to_location_id'];
-            $fromLocId = (int)$returnRow['from_location_id'];
+            $toLocId   = (int)$returnRow['to_location_id'];   // Main Store (receiving)
+            $fromLocId = (int)$returnRow['from_location_id']; // Sub-Branch (originating)
 
             // Fetch return items
             $stmtItems = $pdo->prepare("SELECT * FROM `stock_return_items` WHERE return_id = ?");
             $stmtItems->execute([$rawReturnId]);
             $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
+            $creditNoteItems  = [];
+            $totalCreditAmt   = 0.0;
+            $originalInvoiceRef = $returnRow['original_transfer_no'] ?? '';
+
             foreach ($items as $item) {
-                $rawItemId = (int)$item['item_id'];
+                $rawItemId  = (int)$item['item_id'];
                 $rawBatchId = (int)$item['batch_id'];
-                $qty = (int)$item['quantity'];
+                $qty = (int)($item['quantity'] ?: $item['qty']);
+                $unitRate = (float)($item['unit_rate'] ?: $item['unit_price']);
+                $totalAmt = $qty * $unitRate;
 
                 $stmtBatch = $pdo->prepare("SELECT batch_code, expiry_date, purchase_price, selling_price FROM `item_batches` WHERE id = ?");
                 $stmtBatch->execute([$rawBatchId]);
@@ -363,7 +406,7 @@ class ReturnController extends Controller
                     throw new \Exception("Original batch record ID {$rawBatchId} missing.");
                 }
 
-                // Credit stock to destination location's available stock using InventoryLedgerService
+                // Credit stock to destination (Main Store) available stock
                 InventoryLedgerService::creditStock($toLocId, $rawBatchId, $qty);
                 InventoryLedgerService::recordMovement(
                     'STOCK_RETURN_IN',
@@ -379,28 +422,88 @@ class ReturnController extends Controller
                 );
 
                 // Update return item status
-                $stmtUpdItem = $pdo->prepare("UPDATE `stock_return_items` SET `accepted_qty` = ?, `status` = 'ACCEPTED' WHERE id = ?");
-                $stmtUpdItem->execute([$qty, $item['id']]);
+                $pdo->prepare("UPDATE `stock_return_items` SET `accepted_qty` = ?, `status` = 'ACCEPTED' WHERE id = ?")
+                    ->execute([$qty, $item['id']]);
 
                 // Update return wallet status
-                $stmtUpdWallet = $pdo->prepare("UPDATE `stock_return_wallets` SET `status` = 'ACCEPTED' WHERE return_item_id = ?");
-                $stmtUpdWallet->execute([$item['id']]);
+                $pdo->prepare("UPDATE `stock_return_wallets` SET `status` = 'ACCEPTED' WHERE return_item_id = ?")
+                    ->execute([$item['id']]);
+
+                // Find the original BRANCH_INVOICED transfer that delivered this batch to the Sub-Branch
+                // (auto-link credit note to the original invoice)
+                if (empty($originalInvoiceRef)) {
+                    $stmtInv = $pdo->prepare("
+                        SELECT COALESCE(st.invoice_no, st.transfer_no) AS invoice_ref
+                        FROM `stock_transfers` st
+                        JOIN `stock_transfer_items` sti ON sti.transfer_id = st.id
+                        WHERE st.to_location_id = ?
+                          AND sti.batch_id = ?
+                          AND st.transfer_type = 'BRANCH_INVOICED'
+                        ORDER BY st.id DESC
+                        LIMIT 1
+                    ");
+                    $stmtInv->execute([$fromLocId, $rawBatchId]);
+                    $invRow = $stmtInv->fetch(PDO::FETCH_ASSOC);
+                    if ($invRow && !empty($invRow['invoice_ref'])) {
+                        $originalInvoiceRef = $invRow['invoice_ref'];
+                    }
+                }
+
+                $creditNoteItems[] = [
+                    'item_id'      => $rawItemId,
+                    'batch_id'     => $rawBatchId,
+                    'batch_code'   => $origBatch['batch_code'],
+                    'quantity'     => $qty,
+                    'unit_rate'    => $unitRate,
+                    'total_amount' => $totalAmt,
+                ];
+                $totalCreditAmt += $totalAmt;
             }
 
-            // Update main return status
-            $stmtUpdReturn = $pdo->prepare("UPDATE `stock_returns` SET `status` = 'ACCEPTED', `action_by` = ?, `action_at` = NOW() WHERE id = ?");
-            $stmtUpdReturn->execute([$user['user_id'], $rawReturnId]);
+            // Generate Credit Note to originating Sub-Branch
+            $creditNoteNo = SequenceService::generateNextNumber('credit_note');
+            $pdo->prepare("INSERT INTO `credit_notes`
+                (`credit_note_no`, `return_id`, `branch_location_id`, `original_transfer_no`, `total_amount`, `reason`, `created_by`, `created_at`)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())")
+                ->execute([
+                    $creditNoteNo,
+                    $rawReturnId,
+                    $fromLocId,
+                    $originalInvoiceRef,
+                    round($totalCreditAmt, 3),
+                    "Accepted & Restored to Main Store Stock — {$returnRow['return_reference']}",
+                    $user['user_id']
+                ]);
+            $creditNoteId = (int)$pdo->lastInsertId();
+
+            $stmtCNI = $pdo->prepare("INSERT INTO `credit_note_items`
+                (`credit_note_id`, `item_id`, `batch_id`, `batch_code`, `quantity`, `unit_rate`, `total_amount`)
+                VALUES (?, ?, ?, ?, ?, ?, ?)");
+            foreach ($creditNoteItems as $ci) {
+                $stmtCNI->execute([
+                    $creditNoteId,
+                    $ci['item_id'], $ci['batch_id'], $ci['batch_code'],
+                    $ci['quantity'], $ci['unit_rate'], $ci['total_amount']
+                ]);
+            }
+
+            // Mark return as RESTORED (stock has been returned to usable inventory)
+            $pdo->prepare("UPDATE `stock_returns` SET `status` = 'RESTORED', `action_by` = ?, `action_at` = NOW() WHERE id = ?")
+                ->execute([$user['user_id'], $rawReturnId]);
 
             Model::commit();
 
             AuditLogger::log($user['user_id'], $user['username'], $user['role'], 'STOCK_RETURN', 'ACCEPT_RETURN', null, [
-                'return_id' => $rawReturnId,
-                'return_ref' => $returnRow['return_reference']
+                'return_id'      => $rawReturnId,
+                'return_ref'     => $returnRow['return_reference'],
+                'credit_note_no' => $creditNoteNo,
+                'invoice_linked' => $originalInvoiceRef
             ], $toLocId);
 
             $this->json([
-                'success' => true,
-                'message' => "Stock Return {$returnRow['return_reference']} accepted successfully! Stock credited to available inventory."
+                'success'        => true,
+                'message'        => "Stock Return {$returnRow['return_reference']} accepted & restored to stock. Credit Note {$creditNoteNo} issued to Sub-Branch.",
+                'credit_note_no' => $creditNoteNo
             ]);
 
         } catch (\Exception $e) {
@@ -609,6 +712,7 @@ class ReturnController extends Controller
 
             $creditNoteItems = [];
             $totalCreditAmt  = 0.0;
+            $originalInvoiceRef = $returnRow['original_transfer_no'] ?? '';
 
             // Create a single vendor return ref
             $vendorReturnRef = SequenceService::generateNextNumber('stock_return');
@@ -663,6 +767,22 @@ class ReturnController extends Controller
                 $pdo->prepare("UPDATE `stock_return_wallets` SET `status` = 'ACCEPTED' WHERE return_item_id = ?")
                     ->execute([$item['id']]);
 
+                // Auto-link to original BRANCH_INVOICED transfer
+                if (empty($originalInvoiceRef)) {
+                    $stmtInv = $pdo->prepare("
+                        SELECT COALESCE(st.invoice_no, st.transfer_no) AS invoice_ref
+                        FROM `stock_transfers` st
+                        JOIN `stock_transfer_items` sti ON sti.transfer_id = st.id
+                        WHERE st.to_location_id = ? AND sti.batch_id = ? AND st.transfer_type = 'BRANCH_INVOICED'
+                        ORDER BY st.id DESC LIMIT 1
+                    ");
+                    $stmtInv->execute([$fromLocId, $rawBatchId]);
+                    $invRow = $stmtInv->fetch(PDO::FETCH_ASSOC);
+                    if ($invRow && !empty($invRow['invoice_ref'])) {
+                        $originalInvoiceRef = $invRow['invoice_ref'];
+                    }
+                }
+
                 $creditNoteItems[] = array_merge($item, ['quantity' => $qty, 'unit_rate' => $unitRate, 'total_amount' => $totalAmt, 'batch_code' => $batchRow['batch_code']]);
                 $totalCreditAmt += $totalAmt;
             }
@@ -687,7 +807,7 @@ class ReturnController extends Controller
             $stmtCN = $pdo->prepare("INSERT INTO `credit_notes`
                 (`credit_note_no`, `return_id`, `branch_location_id`, `original_transfer_no`, `total_amount`, `reason`, `created_by`, `created_at`)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmtCN->execute([$creditNoteNo, $rawReturnId, $fromLocId, $returnRow['original_transfer_no'], $totalCreditAmt, "Accepted & Returned to Vendor ({$vendorReturnRef})", $user['user_id']]);
+            $stmtCN->execute([$creditNoteNo, $rawReturnId, $fromLocId, $originalInvoiceRef, round($totalCreditAmt, 3), "Accepted & Returned to Vendor ({$vendorReturnRef})", $user['user_id']]);
             $creditNoteId = (int)$pdo->lastInsertId();
 
             $stmtCNI = $pdo->prepare("INSERT INTO `credit_note_items`
@@ -769,6 +889,7 @@ class ReturnController extends Controller
 
             $creditNoteItems = [];
             $totalCreditAmt  = 0.0;
+            $originalInvoiceRef = $returnRow['original_transfer_no'] ?? '';
 
             foreach ($items as $item) {
                 $rawItemId  = (int)$item['item_id'];
@@ -817,6 +938,22 @@ class ReturnController extends Controller
                 $pdo->prepare("UPDATE `stock_return_wallets` SET `status` = 'ACCEPTED' WHERE return_item_id = ?")
                     ->execute([$item['id']]);
 
+                // Auto-link to original BRANCH_INVOICED transfer if not already set
+                if (empty($originalInvoiceRef)) {
+                    $stmtInv = $pdo->prepare("
+                        SELECT COALESCE(st.invoice_no, st.transfer_no) AS invoice_ref
+                        FROM `stock_transfers` st
+                        JOIN `stock_transfer_items` sti ON sti.transfer_id = st.id
+                        WHERE st.to_location_id = ? AND sti.batch_id = ? AND st.transfer_type = 'BRANCH_INVOICED'
+                        ORDER BY st.id DESC LIMIT 1
+                    ");
+                    $stmtInv->execute([$fromLocId, $rawBatchId]);
+                    $invRow = $stmtInv->fetch(PDO::FETCH_ASSOC);
+                    if ($invRow && !empty($invRow['invoice_ref'])) {
+                        $originalInvoiceRef = $invRow['invoice_ref'];
+                    }
+                }
+
                 $creditNoteItems[] = array_merge($item, ['quantity' => $qty, 'unit_rate' => $unitRate, 'total_amount' => $totalAmt, 'batch_code' => $batchRow['batch_code']]);
                 $totalCreditAmt += $totalAmt;
             }
@@ -826,7 +963,7 @@ class ReturnController extends Controller
             $stmtCN = $pdo->prepare("INSERT INTO `credit_notes`
                 (`credit_note_no`, `return_id`, `branch_location_id`, `original_transfer_no`, `total_amount`, `reason`, `created_by`, `created_at`)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmtCN->execute([$creditNoteNo, $rawReturnId, $fromLocId, $returnRow['original_transfer_no'], $totalCreditAmt, "Accepted & Moved to Damaged Stock — {$damageReason}", $user['user_id']]);
+            $stmtCN->execute([$creditNoteNo, $rawReturnId, $fromLocId, $originalInvoiceRef, round($totalCreditAmt, 3), "Accepted & Moved to Damaged Stock — {$damageReason}", $user['user_id']]);
             $creditNoteId = (int)$pdo->lastInsertId();
 
             $stmtCNI = $pdo->prepare("INSERT INTO `credit_note_items`
@@ -920,49 +1057,12 @@ class ReturnController extends Controller
                 $stmtUpdWallet = $pdo->prepare("UPDATE `stock_return_wallets` SET `status` = 'REJECTED' WHERE return_item_id = ?");
                 $stmtUpdWallet->execute([$item['id']]);
 
-                if ($returnType === 'CLINIC_TO_BRANCH') {
-                    // Move to Clinic Return Reject Wallet
+                if ($returnType === 'CLINIC_TO_BRANCH' || $returnType === 'BRANCH_TO_MAIN') {
+                    // Move to Return Reject Wallet of source location (Clinic or Sub-Branch)
                     $stmtRej = $pdo->prepare("INSERT INTO `stock_return_rejections` 
                         (`return_id`, `return_item_id`, `clinic_location_id`, `item_id`, `batch_id`, `batch_code`, `quantity`, `rejection_reason`, `status`, `created_at`) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IN_REJECT_WALLET', NOW())");
                     $stmtRej->execute([$rawReturnId, $item['id'], $fromLocId, $rawItemId, $rawBatchId, $item['batch_code'], $qty, $rejectionReason]);
-                } else if ($returnType === 'BRANCH_TO_MAIN') {
-                    // Move to Damaged / Rejected Stock at Main Store
-                    $stmtDmg = $pdo->prepare("INSERT INTO `damaged_stock` 
-                        (`return_id`, `return_item_id`, `location_id`, `item_id`, `batch_id`, `batch_code`, `quantity`, `reason`, `created_at`) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-                    $stmtDmg->execute([$rawReturnId, $item['id'], $toLocId, $rawItemId, $rawBatchId, $item['batch_code'], $qty, $rejectionReason]);
-
-                    $creditNoteItems[] = $item;
-                    $totalCreditNoteAmount += (float)$item['total_amount'];
-                }
-            }
-
-            // Generate Credit Note if Branch -> Main Store rejection
-            $creditNoteNo = null;
-            if ($returnType === 'BRANCH_TO_MAIN' && !empty($creditNoteItems)) {
-                $creditNoteNo = SequenceService::generateNextNumber('credit_note');
-
-                $stmtCN = $pdo->prepare("INSERT INTO `credit_notes` 
-                    (`credit_note_no`, `return_id`, `branch_location_id`, `original_transfer_no`, `total_amount`, `reason`, `created_by`, `created_at`) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-                $stmtCN->execute([$creditNoteNo, $rawReturnId, $fromLocId, $returnRow['original_transfer_no'], $totalCreditNoteAmount, $rejectionReason, $user['user_id']]);
-                $creditNoteId = (int)$pdo->lastInsertId();
-
-                $stmtCNItem = $pdo->prepare("INSERT INTO `credit_note_items` 
-                    (`credit_note_id`, `item_id`, `batch_id`, `batch_code`, `quantity`, `unit_rate`, `total_amount`) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)");
-
-                foreach ($creditNoteItems as $cItem) {
-                    $stmtCNItem->execute([
-                        $creditNoteId,
-                        $cItem['item_id'],
-                        $cItem['batch_id'],
-                        $cItem['batch_code'],
-                        $cItem['quantity'],
-                        $cItem['unit_rate'],
-                        $cItem['total_amount']
-                    ]);
                 }
             }
 
@@ -974,18 +1074,16 @@ class ReturnController extends Controller
 
             AuditLogger::log($user['user_id'], $user['username'], $user['role'], 'STOCK_RETURN', 'REJECT_RETURN', null, [
                 'return_id' => $rawReturnId,
-                'return_ref' => $returnRow['return_reference'],
-                'credit_note_no' => $creditNoteNo
+                'return_ref' => $returnRow['return_reference']
             ], $toLocId);
 
             $msg = $returnType === 'CLINIC_TO_BRANCH' 
                 ? "Return {$returnRow['return_reference']} rejected and placed into Clinic Return Reject Wallet."
-                : "Return {$returnRow['return_reference']} rejected. Stock logged in Damaged Stock and Credit Note {$creditNoteNo} generated against Branch.";
+                : "Return {$returnRow['return_reference']} rejected and placed into Branch Return Reject Wallet.";
 
             $this->json([
                 'success' => true,
-                'message' => $msg,
-                'credit_note_no' => $creditNoteNo
+                'message' => $msg
             ]);
 
         } catch (\Exception $e) {
@@ -1010,11 +1108,14 @@ class ReturnController extends Controller
         }
 
         $sql = "SELECT srr.*, COALESCE(sr.return_reference, sr.return_no) AS return_reference,
-                i.name AS item_name, i.item_code, i.unit_of_measure, l.name AS clinic_name
+                i.name AS item_name, i.item_code, i.unit_of_measure, l.name AS clinic_name,
+                pi.vendor_invoice_no, pi.document_url AS invoice_document_url, pi.invoice_no AS system_purchase_no
                 FROM `stock_return_rejections` srr
                 JOIN `stock_returns` sr ON srr.return_id = sr.id
                 JOIN `items` i ON srr.item_id = i.id
                 JOIN `locations` l ON srr.clinic_location_id = l.id
+                LEFT JOIN `purchase_invoice_items` pii ON pii.batch_id = srr.batch_id
+                LEFT JOIN `purchase_invoices` pi ON pii.purchase_invoice_id = pi.id
                 WHERE srr.status = 'IN_REJECT_WALLET'";
 
         $params = [];
@@ -1089,9 +1190,21 @@ class ReturnController extends Controller
                 $user['user_id']
             );
 
-            // Update rejection record status
-            $stmtUpd = $pdo->prepare("UPDATE `stock_return_rejections` SET `status` = 'RESTORED_TO_STOCK', `restored_by` = ?, `restored_at` = NOW() WHERE id = ?");
+            // Update rejection record status to RESTORED
+            $stmtUpd = $pdo->prepare("UPDATE `stock_return_rejections` SET `status` = 'RESTORED', `restored_by` = ?, `restored_at` = NOW() WHERE id = ?");
             $stmtUpd->execute([$user['user_id'], $rawRejId]);
+
+            // Update corresponding return item status to RESTORED
+            if (!empty($rejRow['return_item_id'])) {
+                $pdo->prepare("UPDATE `stock_return_items` SET `status` = 'RESTORED' WHERE id = ?")
+                    ->execute([$rejRow['return_item_id']]);
+            }
+
+            // Update parent return record status to RESTORED
+            if (!empty($rejRow['return_id'])) {
+                $pdo->prepare("UPDATE `stock_returns` SET `status` = 'RESTORED', `action_by` = ?, `action_at` = NOW() WHERE id = ?")
+                    ->execute([$user['user_id'], $rejRow['return_id']]);
+            }
 
             Model::commit();
 
@@ -1102,7 +1215,7 @@ class ReturnController extends Controller
 
             $this->json([
                 'success' => true,
-                'message' => 'Stock item successfully restored back into Clinic Available Stock!'
+                'message' => 'Stock item successfully restored back into Available Stock! Status updated to RESTORED.'
             ]);
 
         } catch (\Exception $e) {
@@ -1163,11 +1276,14 @@ class ReturnController extends Controller
 
         $sql = "SELECT ds.*, 
                        COALESCE(sr.return_reference, sr.return_no) AS return_reference,
-                       i.name AS item_name, i.item_code, i.unit_of_measure, l.name AS location_name
+                       i.name AS item_name, i.item_code, i.unit_of_measure, l.name AS location_name,
+                       pi.vendor_invoice_no, pi.document_url AS invoice_document_url, pi.invoice_no AS system_purchase_no
                 FROM `damaged_stock` ds
                 JOIN `stock_returns` sr ON ds.return_id = sr.id
                 JOIN `items` i ON ds.item_id = i.id
                 JOIN `locations` l ON ds.location_id = l.id
+                LEFT JOIN `purchase_invoice_items` pii ON pii.batch_id = ds.batch_id
+                LEFT JOIN `purchase_invoices` pi ON pii.purchase_invoice_id = pi.id
                 ORDER BY ds.id DESC";
 
         $stmt = $pdo->query($sql);
@@ -1228,10 +1344,13 @@ class ReturnController extends Controller
                                     COALESCE(sri.unit_rate, sri.unit_price)  AS unit_rate,
                                     COALESCE(sri.total_amount, sri.subtotal) AS total_amount,
                                     i.name AS item_name, i.item_code, i.unit_of_measure,
-                                    b.expiry_date
+                                    b.expiry_date,
+                                    pi.vendor_invoice_no, pi.document_url AS invoice_document_url, pi.invoice_no AS system_purchase_no
                                     FROM `stock_return_items` sri
                                     JOIN `items` i ON sri.item_id = i.id
                                     JOIN `item_batches` b ON sri.batch_id = b.id
+                                    LEFT JOIN `purchase_invoice_items` pii ON pii.batch_id = b.id
+                                    LEFT JOIN `purchase_invoices` pi ON pii.purchase_invoice_id = pi.id
                                     WHERE sri.return_id = ?");
 
         foreach ($returns as &$ret) {
@@ -1244,5 +1363,54 @@ class ReturnController extends Controller
         }
 
         $this->json(['success' => true, 'returns' => $returns]);
+    }
+
+    /**
+     * Get Return to Vendor Stock Directory
+     */
+    public function getVendorReturns()
+    {
+        $user = $this->requireRoles(['ADMIN']);
+        $pdo = Model::getDB();
+
+        $sql = "SELECT sr.*, 
+                       COALESCE(sr.return_reference, sr.return_no) AS return_reference,
+                       COALESCE(v.name, 'N/A') AS vendor_name, COALESCE(v.code, '') AS vendor_code,
+                       l.name AS location_name, u.full_name AS created_by_name
+                FROM `stock_returns` sr
+                LEFT JOIN `vendors` v ON sr.vendor_id = v.id
+                LEFT JOIN `locations` l ON sr.from_location_id = l.id
+                LEFT JOIN `users` u ON sr.created_by = u.id
+                WHERE sr.return_type = 'MAIN_TO_VENDOR' OR sr.vendor_id IS NOT NULL
+                ORDER BY sr.id DESC";
+
+        $stmt = $pdo->query($sql);
+        $returns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtItems = $pdo->prepare("SELECT sri.id, sri.return_id, sri.item_id, sri.batch_id, sri.status,
+                                    COALESCE(NULLIF(sri.batch_code,''), b.batch_code) AS batch_code,
+                                    COALESCE(sri.quantity, sri.qty)          AS quantity,
+                                    COALESCE(sri.unit_rate, sri.unit_price)  AS unit_rate,
+                                    COALESCE(sri.total_amount, sri.subtotal) AS total_amount,
+                                    i.name AS item_name, i.item_code, i.unit_of_measure,
+                                    b.expiry_date,
+                                    pi.vendor_invoice_no, pi.document_url AS invoice_document_url, pi.invoice_no AS system_purchase_no
+                                    FROM `stock_return_items` sri
+                                    JOIN `items` i ON sri.item_id = i.id
+                                    JOIN `item_batches` b ON sri.batch_id = b.id
+                                    LEFT JOIN `purchase_invoice_items` pii ON pii.batch_id = b.id
+                                    LEFT JOIN `purchase_invoices` pi ON pii.purchase_invoice_id = pi.id
+                                    WHERE sri.return_id = ?");
+
+        foreach ($returns as &$ret) {
+            $rawId = (int)$ret['id'];
+            $ret['raw_id'] = $rawId;
+            $ret['id'] = UrlSecurity::encrypt($rawId);
+
+            $stmtItems->execute([$rawId]);
+            $ret['items'] = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $this->json(['success' => true, 'vendor_returns' => $returns]);
     }
 }

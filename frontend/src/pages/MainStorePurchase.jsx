@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/common/DataTable';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { formatDate } from '../utils/date';
@@ -7,6 +8,9 @@ import { formatCurrency } from '../utils/currency';
 import { ShoppingCart, Plus, Trash2, CheckCircle2, AlertCircle, Calculator, Tag, Sparkles, FileText, Eye, X, Paperclip, UploadCloud, FileCheck, ExternalLink, Download } from 'lucide-react';
 
 export default function MainStorePurchase() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [vendors, setVendors] = useState([]);
   const [items, setItems] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -906,7 +910,7 @@ export default function MainStorePurchase() {
                     <th className="p-3">Item Name & Code</th>
                     <th className="p-3 w-32">Batch Code</th>
                     <th className="p-3 w-20 text-center">Qty</th>
-                    <th className="p-3 w-28 text-right">Cost Price ({currencyCode})</th>
+                    {isAdmin && <th className="p-3 w-28 text-right">Cost Price ({currencyCode})</th>}
                     <th className="p-3 w-28 text-right">Sales Price ({currencyCode})</th>
                     <th className="p-3 w-28">Expiry Date</th>
                     <th className="p-3 w-28 text-right">Subtotal ({currencyCode})</th>
@@ -926,9 +930,11 @@ export default function MainStorePurchase() {
                         <td className="p-3 text-center font-bold text-brand-blue">
                           {item.qty}
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {formatCurrency(item.purchase_price, currencyCode, decimalPlaces)}
-                        </td>
+                        {isAdmin && (
+                          <td className="p-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {formatCurrency(item.purchase_price, currencyCode, decimalPlaces)}
+                          </td>
+                        )}
                         <td className="p-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(item.selling_price, currencyCode, decimalPlaces)}
                         </td>

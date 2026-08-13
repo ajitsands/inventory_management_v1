@@ -23,6 +23,12 @@ function MainApp() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  React.useEffect(() => {
+    if (user) {
+      setActiveTab('dashboard');
+    }
+  }, [user?.id, user?.username]);
+
   if (!user) {
     return <Login />;
   }
@@ -46,7 +52,9 @@ function MainApp() {
         {activeTab === 'opd-sales' && <ClinicSalesPOS />}
         {activeTab === 'batches' && <BatchInventory />}
         {activeTab === 'audit-trail' && <AuditTrailPage />}
-        {activeTab === 'reports' && <ReportsPage />}
+        {activeTab === 'reports' && <ReportsPage defaultSubTab="ledger" />}
+        {activeTab === 'consolidated-report' && <ReportsPage defaultSubTab="admin_consolidated" />}
+        {activeTab === 'invoices-report' && <ReportsPage defaultSubTab="invoices" />}
         {activeTab === 'user-mgmt' && <UserManagement />}
       </main>
     </div>

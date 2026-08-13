@@ -80,14 +80,14 @@ export default function ClinicSalesPOS() {
 
   const loadData = async () => {
     try {
-      const [masterRes, custRes, salesRes, settingsRes] = await Promise.all([
-        apiFetch('/master-data'),
+      const [locRes, custRes, salesRes, settingsRes] = await Promise.all([
+        apiFetch('/locations'),
         apiFetch('/customers'),
         apiFetch('/sales/list'),
         apiFetch('/settings')
       ]);
 
-      const clns = (masterRes.locations || []).filter(l => l.type === 'CLINIC');
+      const clns = (locRes.locations || []).filter(l => l.type === 'CLINIC');
       setClinics(clns);
 
       const custs = custRes.customers || [];
@@ -102,20 +102,24 @@ export default function ClinicSalesPOS() {
       }
 
       // Clinic Location Context Selection
-      const userLocId = user?.location_id || user?.raw_location_id;
-      const userClinic = clns.find(c => c.id == userLocId || c.raw_id == userLocId);
+      const userClinic = clns.find(c => 
+        (c.raw_id && user?.raw_location_id && c.raw_id == user.raw_location_id) ||
+        (c.raw_id && user?.location_id && c.raw_id == user.location_id) ||
+        (c.name && user?.location_name && c.name === user.location_name) ||
+        (c.id && user?.location_id && c.id === user.location_id)
+      );
 
       let initialClinicId = '';
       if (userClinic) {
         initialClinicId = userClinic.id;
       } else if (clns.length > 0) {
         initialClinicId = clns[0].id;
-      } else {
-        initialClinicId = 4; // Fallback Clinic ID
       }
 
-      setSelectedClinicId(initialClinicId);
-      await fetchClinicStockAndDoctors(initialClinicId, clns);
+      if (initialClinicId) {
+        setSelectedClinicId(initialClinicId);
+        await fetchClinicStockAndDoctors(initialClinicId, clns);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -387,7 +391,11 @@ export default function ClinicSalesPOS() {
   ];
 
   const selectedCustomerObj = customers.find(c => c.id === selectedCustomerId || c.raw_id == selectedCustomerId);
-  const selectedClinicObj = clinics.find(c => c.id === selectedClinicId || c.raw_id == selectedClinicId);
+  const selectedClinicObj = clinics.find(c => 
+    c.id === selectedClinicId || 
+    c.raw_id == selectedClinicId || 
+    (c.name && user?.location_name && c.name === user.location_name)
+  );
 
   const doctorOptions = clinicDoctors.length > 0 ? clinicDoctors.map(d => ({
     value: d.name,

@@ -11,24 +11,26 @@ import {
   ShieldAlert,
   Users,
   Layers,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
   const { user } = useAuth();
   const role = user?.role || 'AUDITOR';
-  const userLocId = user?.location_id || user?.raw_location_id;
+  const userLocId = user?.raw_location_id || user?.location_id;
   const isGlobalOrMainAdmin = (role === 'ADMIN') || (!userLocId || userLocId == 1);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'STORE_MANAGER', 'OPD_USER', 'AUDITOR'] },
     ...(isGlobalOrMainAdmin ? [{ id: 'purchase', label: 'Vendor Purchase (Main Store)', icon: ShoppingCart, roles: ['ADMIN', 'STORE_MANAGER'] }] : []),
     ...(isGlobalOrMainAdmin ? [{ id: 'branch-transfer', label: 'Sub-Branch Invoicing', icon: GitPullRequest, roles: ['ADMIN', 'STORE_MANAGER'] }] : []),
-    { id: 'clinic-transfer', label: 'Clinic Stock Transfer', icon: Building, roles: ['ADMIN', 'STORE_MANAGER'] },
-    { id: 'opd-sales', label: 'OPD Dispensing (FIFO)', icon: Stethoscope, roles: ['ADMIN', 'STORE_MANAGER', 'OPD_USER'] },
+    { id: 'clinic-transfer', label: 'Clinic Stock Transfer', icon: Building, roles: ['STORE_MANAGER'] },
+    { id: 'opd-sales', label: 'OPD Dispensing (FIFO)', icon: Stethoscope, roles: ['OPD_USER'] },
     { id: 'returns', label: 'Stock Return Wallet', icon: RotateCcw, roles: ['ADMIN', 'STORE_MANAGER', 'OPD_USER'] },
     { id: 'batches', label: 'Batch Stock Inspector', icon: Boxes, roles: ['ADMIN', 'STORE_MANAGER', 'OPD_USER', 'AUDITOR'] },
     { id: 'reports', label: 'Movement Reports & Valuation', icon: FileSpreadsheet, roles: ['ADMIN', 'STORE_MANAGER', 'AUDITOR'] },
+    { id: 'consolidated-report', label: 'Item Consolidated Valuation', icon: ShieldCheck, roles: ['ADMIN'] },
     { id: 'audit-trail', label: 'System Audit Trail', icon: ShieldAlert, roles: ['ADMIN', 'AUDITOR'] },
     { id: 'user-mgmt', label: 'User Management', icon: Users, roles: ['ADMIN'] },
   ];

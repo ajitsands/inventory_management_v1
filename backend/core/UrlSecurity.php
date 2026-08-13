@@ -59,8 +59,13 @@ class UrlSecurity {
             $result = [];
             foreach ($data as $key => $val) {
                 if (in_array($key, $keysToEncrypt, true) && (is_numeric($val) || is_string($val))) {
-                    $result[$key] = self::encrypt($val);
-                    $result['raw_' . $key] = (int)$val; // Keep raw for internal frontend use if needed
+                    if (is_string($val) && strpos($val, 'enc_') === 0) {
+                        // Already encrypted, just preserve it
+                        $result[$key] = $val;
+                    } else {
+                        $result[$key] = self::encrypt($val);
+                        $result['raw_' . $key] = (int)$val; // Keep raw for internal frontend use if needed
+                    }
                 } elseif (is_array($val)) {
                     $result[$key] = self::encryptPayload($val, $keysToEncrypt);
                 } else {
