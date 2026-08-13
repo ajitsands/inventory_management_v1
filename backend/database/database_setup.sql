@@ -50,7 +50,7 @@ CREATE TABLE `branch_payments` (
   PRIMARY KEY (`id`),
   KEY `transfer_id` (`transfer_id`),
   CONSTRAINT `branch_payments_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `stock_transfers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `categories`
 CREATE TABLE `categories` (
@@ -61,7 +61,7 @@ CREATE TABLE `categories` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `categories`
 INSERT INTO `categories` (`id`, `name`, `code`, `description`) VALUES ('1', 'Pharmaceuticals & Medicines', 'CAT-MED', 'Prescription drugs, antibiotics, pain relievers, and syrups');
@@ -85,7 +85,7 @@ CREATE TABLE `credit_note_items` (
   CONSTRAINT `credit_note_items_ibfk_1` FOREIGN KEY (`credit_note_id`) REFERENCES `credit_notes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `credit_note_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `credit_note_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `credit_notes`
 CREATE TABLE `credit_notes` (
@@ -106,7 +106,7 @@ CREATE TABLE `credit_notes` (
   CONSTRAINT `credit_notes_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `stock_returns` (`id`) ON DELETE CASCADE,
   CONSTRAINT `credit_notes_ibfk_2` FOREIGN KEY (`branch_location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `credit_notes_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `customers`
 CREATE TABLE `customers` (
@@ -120,7 +120,7 @@ CREATE TABLE `customers` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `customers`
 INSERT INTO `customers` (`id`, `name`, `code`, `phone`, `email`, `address`, `status`, `created_at`) VALUES ('1', 'Walk-in General Customer', 'CUST-001', '+1 555-0101', 'walkin@patient.org', 'OPD Clinic Desk', 'ACTIVE', '2026-08-12 00:33:34');
@@ -149,7 +149,7 @@ CREATE TABLE `damaged_stock` (
   CONSTRAINT `damaged_stock_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `damaged_stock_ibfk_3` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `damaged_stock_ibfk_4` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `doctors`
 CREATE TABLE `doctors` (
@@ -166,7 +166,7 @@ CREATE TABLE `doctors` (
   UNIQUE KEY `doctor_code` (`doctor_code`),
   KEY `location_id` (`location_id`),
   CONSTRAINT `doctors_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `doctors`
 INSERT INTO `doctors` (`id`, `doctor_code`, `name`, `speciality`, `phone`, `email`, `location_id`, `status`, `created_at`) VALUES ('1', 'DOC-001', 'Dr. Alexander Smith', 'General Physician / OPD', '+973 1700-1111', 'dr.smith@organization.org', '4', 'ACTIVE', '2026-08-12 02:50:44');
@@ -193,7 +193,7 @@ CREATE TABLE `invoice_payment_records` (
   KEY `idx_pay_invoice` (`invoice_no`),
   CONSTRAINT `invoice_payment_records_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `stock_transfers` (`id`) ON DELETE CASCADE,
   CONSTRAINT `invoice_payment_records_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `item_batches`
 CREATE TABLE `item_batches` (
@@ -218,7 +218,7 @@ CREATE TABLE `item_batches` (
   KEY `idx_expiry_date` (`expiry_date`),
   CONSTRAINT `item_batches_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `item_batches_ibfk_2` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `items`
 CREATE TABLE `items` (
@@ -233,7 +233,7 @@ CREATE TABLE `items` (
   UNIQUE KEY `item_code` (`item_code`),
   KEY `category_id` (`category_id`),
   CONSTRAINT `items_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `items`
 INSERT INTO `items` (`id`, `item_code`, `name`, `category_id`, `unit_of_measure`, `min_reorder_level`, `created_at`) VALUES ('1', 'MED-PAR-500', 'Paracetamol 500mg Tablets (Box of 100)', '1', 'Box', '20', '2026-08-11 21:04:48');
@@ -255,7 +255,7 @@ CREATE TABLE `location_batch_stock` (
   KEY `batch_id` (`batch_id`),
   CONSTRAINT `location_batch_stock_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `location_batch_stock_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `locations`
 CREATE TABLE `locations` (
@@ -269,7 +269,7 @@ CREATE TABLE `locations` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `locations`
 INSERT INTO `locations` (`id`, `name`, `code`, `type`, `address`, `phone`, `status`, `created_at`) VALUES ('1', 'Central Main Warehouse & Branch', 'LOC-MAIN-01', 'MAIN_BRANCH', '100 Central Avenue, Tech City', '+1 800-555-0100', 'ACTIVE', '2026-08-11 21:04:48');
@@ -297,7 +297,7 @@ CREATE TABLE `purchase_invoice_items` (
   CONSTRAINT `purchase_invoice_items_ibfk_1` FOREIGN KEY (`purchase_invoice_id`) REFERENCES `purchase_invoices` (`id`) ON DELETE CASCADE,
   CONSTRAINT `purchase_invoice_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `purchase_invoice_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `purchase_invoices`
 CREATE TABLE `purchase_invoices` (
@@ -322,7 +322,7 @@ CREATE TABLE `purchase_invoices` (
   CONSTRAINT `purchase_invoices_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`),
   CONSTRAINT `purchase_invoices_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `purchase_invoices_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `sales_invoice_items`
 CREATE TABLE `sales_invoice_items` (
@@ -340,7 +340,7 @@ CREATE TABLE `sales_invoice_items` (
   CONSTRAINT `sales_invoice_items_ibfk_1` FOREIGN KEY (`sales_invoice_id`) REFERENCES `sales_invoices` (`id`) ON DELETE CASCADE,
   CONSTRAINT `sales_invoice_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `sales_invoice_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `sales_invoices`
 CREATE TABLE `sales_invoices` (
@@ -363,7 +363,7 @@ CREATE TABLE `sales_invoices` (
   KEY `created_by` (`created_by`),
   CONSTRAINT `sales_invoices_ibfk_1` FOREIGN KEY (`clinic_location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `sales_invoices_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_movements_ledger`
 CREATE TABLE `stock_movements_ledger` (
@@ -387,7 +387,7 @@ CREATE TABLE `stock_movements_ledger` (
   CONSTRAINT `stock_movements_ledger_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `stock_movements_ledger_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`),
   CONSTRAINT `stock_movements_ledger_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_return_items`
 CREATE TABLE `stock_return_items` (
@@ -412,7 +412,7 @@ CREATE TABLE `stock_return_items` (
   CONSTRAINT `stock_return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `stock_returns` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_return_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `stock_return_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_return_rejections`
 CREATE TABLE `stock_return_rejections` (
@@ -438,7 +438,7 @@ CREATE TABLE `stock_return_rejections` (
   CONSTRAINT `stock_return_rejections_ibfk_2` FOREIGN KEY (`clinic_location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_return_rejections_ibfk_3` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `stock_return_rejections_ibfk_4` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_return_wallets`
 CREATE TABLE `stock_return_wallets` (
@@ -463,7 +463,7 @@ CREATE TABLE `stock_return_wallets` (
   CONSTRAINT `stock_return_wallets_ibfk_3` FOREIGN KEY (`target_location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_return_wallets_ibfk_4` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `stock_return_wallets_ibfk_5` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_returns`
 CREATE TABLE `stock_returns` (
@@ -499,7 +499,7 @@ CREATE TABLE `stock_returns` (
   CONSTRAINT `stock_returns_ibfk_2` FOREIGN KEY (`to_location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `stock_returns_ibfk_3` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`),
   CONSTRAINT `stock_returns_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_transfer_items`
 CREATE TABLE `stock_transfer_items` (
@@ -517,7 +517,7 @@ CREATE TABLE `stock_transfer_items` (
   CONSTRAINT `stock_transfer_items_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `stock_transfers` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_transfer_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `stock_transfer_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `item_batches` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `stock_transfers`
 CREATE TABLE `stock_transfers` (
@@ -553,7 +553,7 @@ CREATE TABLE `stock_transfers` (
   CONSTRAINT `stock_transfers_ibfk_2` FOREIGN KEY (`to_location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `stock_transfers_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
   CONSTRAINT `stock_transfers_ibfk_4` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `system_audit_trail`
 CREATE TABLE `system_audit_trail` (
@@ -572,7 +572,7 @@ CREATE TABLE `system_audit_trail` (
   KEY `idx_audit_module` (`module`),
   KEY `idx_audit_user` (`user_id`),
   KEY `idx_audit_time` (`timestamp`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `system_sequences`
 CREATE TABLE `system_sequences` (
@@ -585,7 +585,7 @@ CREATE TABLE `system_sequences` (
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `sequence_key` (`sequence_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `system_sequences`
 INSERT INTO `system_sequences` (`id`, `sequence_key`, `prefix`, `current_val`, `padding_length`, `format_template`, `updated_at`) VALUES ('1', 'vendor', 'VND-', '0', '4', '{PREFIX}{SEQ}', '2026-08-13 16:36:03');
@@ -609,7 +609,7 @@ CREATE TABLE `system_settings` (
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `setting_key` (`setting_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `system_settings`
 INSERT INTO `system_settings` (`id`, `setting_key`, `setting_value`, `updated_at`) VALUES ('1', 'store_name', 'Al RABEEH GROUP OF MEDICALS', '2026-08-12 13:05:46');
@@ -641,7 +641,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   KEY `location_id` (`location_id`),
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `users`
 INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `password_hash`, `role`, `location_id`, `status`, `created_at`) VALUES ('1', 'admin', 'System Administrator', 'admin@organization.org', '$2y$10$i.IgOtpr13Y7ke6Envdrk.nIHSKd29SLD7kaAqX924YoWiNp65ye2', 'ADMIN', '1', 'ACTIVE', '2026-08-11 21:04:48');
@@ -667,7 +667,7 @@ CREATE TABLE `vendor_quotation_items` (
   KEY `item_id` (`item_id`),
   CONSTRAINT `vendor_quotation_items_ibfk_1` FOREIGN KEY (`quotation_id`) REFERENCES `vendor_quotations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `vendor_quotation_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `vendor_quotations`
 CREATE TABLE `vendor_quotations` (
@@ -689,7 +689,7 @@ CREATE TABLE `vendor_quotations` (
   KEY `location_id` (`location_id`),
   CONSTRAINT `vendor_quotations_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE CASCADE,
   CONSTRAINT `vendor_quotations_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table structure for table `vendors`
 CREATE TABLE `vendors` (
@@ -705,7 +705,7 @@ CREATE TABLE `vendors` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed data for table `vendors`
 INSERT INTO `vendors` (`id`, `name`, `code`, `contact_person`, `phone`, `email`, `address`, `tax_id`, `status`, `created_at`) VALUES ('1', 'MediTech Pharma Supplies', 'VEND-001', 'John Stevenson', '+1 555-111-2222', 'sales@meditech.com', '500 Pharma Way, Industrial Park', 'TAX-8899001', 'ACTIVE', '2026-08-11 21:04:48');
