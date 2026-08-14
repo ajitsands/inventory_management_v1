@@ -85,12 +85,25 @@ function activateLicense($licenseKey) {
     $data = json_decode($response, true);
 
     if ($httpCode === 200 && !empty($data['token']) && !empty($data['public_key'])) {
-        // SUCCESS: Save $data['token'] and $data['public_key'] to your local database!
+        // SUCCESS: Save the license data to your application!
+        saveLicenseData($licenseKey, $data['token'], $data['public_key']);
         return true;
     }
 
     throw new Exception($data['message'] ?? 'Unknown activation error.');
 }
+
+// ---------------------------------------------------------
+// NOTE ON DATA STORAGE:
+// You DO NOT need a dedicated database table for this. 
+// You simply need to save 3 strings:
+// 1. $licenseKey 
+// 2. $data['token'] 
+// 3. $data['public_key']
+//
+// You can save these in an existing `settings` key-value table, 
+// a local `.env` file, or a secure JSON file.
+// ---------------------------------------------------------
 ```
 
 ---
