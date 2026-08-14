@@ -83,6 +83,7 @@ $router->get('/api/v1/settings', ['SettingsController', 'index']);
 $router->post('/api/v1/settings', ['SettingsController', 'updateSettings']);
 $router->post('/api/v1/settings/sequences', ['SettingsController', 'updateSequences']);
 $router->post('/api/v1/settings/clear-transactions', ['SettingsController', 'clearTransactionalData']);
+$router->get('/api/v1/settings/latest-products', ['SettingsController', 'getLatestProducts']);
 
 // Vendor Quotations & PO Routes
 $router->get('/api/v1/quotations', ['QuotationController', 'index']);

@@ -154,4 +154,26 @@ class SettingsController extends Controller
             $this->error('Failed to clear transactional data: ' . $e->getMessage(), 500);
         }
     }
+
+    public function getLatestProducts()
+    {
+        $this->requireAuth();
+        try {
+            $ctx = stream_context_create([
+                "http" => [
+                    "method" => "GET",
+                    "header" => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
+                    "timeout" => 5
+                ]
+            ]);
+            $json = @file_get_contents('https://sandslab.com/get_our_latest_products.php', false, $ctx);
+            if ($json === false) {
+                throw new \Exception("Unable to contact SaNDS Lab server.");
+            }
+            $data = json_decode($json, true);
+            $this->json($data);
+        } catch (\Exception $e) {
+            $this->error($e->getMessage(), 500);
+        }
+    }
 }
