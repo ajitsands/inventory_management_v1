@@ -12,6 +12,8 @@ class Controller {
     protected function json($data, $statusCode = 200) {
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');

@@ -13,6 +13,7 @@ export async function apiFetch(endpoint, options = {}) {
   };
 
   const config = {
+    cache: 'no-store',
     ...options,
     headers
   };
