@@ -158,4 +158,65 @@ class LicenseService {
 
         return true;
     }
+
+    public static function checkLiveStatus() {
+        try {
+            $settings = SequenceService::getSettings();
+            $licenseKey = $settings['license_key'] ?? '';
+            if (empty($licenseKey)) return ['valid' => true];
+
+            $domain = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $resolvedIp = gethostbyname($domain);
+            
+            if ($resolvedIp === $domain || $resolvedIp === '127.0.0.1' || $resolvedIp === '::1' || strpos($resolvedIp, '192.168.') === 0 || strpos($resolvedIp, '10.') === 0) {
+                $publicIp = @file_get_contents('https://api.ipify.org');
+                if ($publicIp) {
+                    $resolvedIp = trim($publicIp);
+                } else {
+                    $resolvedIp = $_SERVER['SERVER_ADDR'] ?? '';
+                }
+            }
+            
+            $postData = [
+                'license_key' => $licenseKey,
+                'domain_name' => $domain,
+                'ip_address' => $resolvedIp
+            ];
+
+            $url = 'https://key.sandslab.com/public/api/activate';
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($postData),
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Connection: close'
+                ],
+                CURLOPT_TIMEOUT => 4, // Fast timeout for login graceful degradation
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            // Only explicitly block if the server responded with 403 (deactivated/mismatch) or 404 (deleted)
+            if ($httpCode === 403 || $httpCode === 404) {
+                $data = @json_decode($response, true);
+                if (isset($data['success']) && $data['success'] === false) {
+                    return [
+                        'valid' => false,
+                        'message' => $data['message'] ?? 'License has been deactivated or is invalid.'
+                    ];
+                }
+            }
+            
+            // If timeout or other error, assume valid and fallback to local crypto check
+            return ['valid' => true];
+        } catch (\Exception $e) {
+            return ['valid' => true];
+        }
+    }
 }

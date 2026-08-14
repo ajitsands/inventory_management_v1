@@ -21,6 +21,13 @@ class AuthController extends Controller {
             $this->error('Invalid username or password.', 401);
         }
 
+        require_once __DIR__ . '/../Services/LicenseService.php';
+        $liveStatus = LicenseService::checkLiveStatus();
+        if (!$liveStatus['valid']) {
+            AuditLogger::log(null, $username, 'UNAUTHENTICATED', 'AUTH', 'LOGIN_FAILED', null, ['reason' => 'License deactivated']);
+            $this->error($liveStatus['message'] ?? 'Software license is no longer active.', 403);
+        }
+
         $token = $this->generateAuthToken($user);
 
         // Sanitize return object
