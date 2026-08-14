@@ -34,6 +34,35 @@ try {
 // Instantiate Router
 $router = new Router();
 
+// License interceptor (blocks all API requests except public licensing endpoints)
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$publicLicenseRoutes = [
+    '/api/v1/settings/activate-license',
+    '/api/v1/settings/license-status'
+];
+
+// Normalize base path if script is running in subdirectory
+$basePath = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$relativeUri = $uri;
+if (!empty($basePath) && strpos($uri, $basePath) === 0) {
+    $relativeUri = substr($uri, strlen($basePath));
+}
+
+if (strpos($relativeUri, '/api/v1/') === 0 && !in_array($relativeUri, $publicLicenseRoutes)) {
+    require_once __DIR__ . '/../app/Services/LicenseService.php';
+    $licenseCheck = LicenseService::checkLicense();
+    if (!$licenseCheck['valid']) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'license_error' => true,
+            'message' => $licenseCheck['message']
+        ]);
+        exit;
+    }
+}
+
 // Auth Routes
 $router->post('/api/v1/auth/login', ['AuthController', 'login']);
 $router->get('/api/v1/auth/me', ['AuthController', 'me']);
@@ -84,6 +113,8 @@ $router->post('/api/v1/settings', ['SettingsController', 'updateSettings']);
 $router->post('/api/v1/settings/sequences', ['SettingsController', 'updateSequences']);
 $router->post('/api/v1/settings/clear-transactions', ['SettingsController', 'clearTransactionalData']);
 $router->get('/api/v1/settings/latest-products', ['SettingsController', 'getLatestProducts']);
+$router->post('/api/v1/settings/activate-license', ['SettingsController', 'activateLicense']);
+$router->get('/api/v1/settings/license-status', ['SettingsController', 'licenseStatus']);
 
 // Vendor Quotations & PO Routes
 $router->get('/api/v1/quotations', ['QuotationController', 'index']);

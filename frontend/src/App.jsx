@@ -19,16 +19,65 @@ import BatchInventory from './pages/BatchInventory';
 import AuditTrailPage from './pages/AuditTrailPage';
 import ReportsPage from './pages/ReportsPage';
 import UserManagement from './pages/UserManagement';
+import LicenseActivation from './pages/LicenseActivation';
+import { apiFetch } from './utils/api';
 
 function MainApp() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [licenseValid, setLicenseValid] = useState(true);
+  const [licenseError, setLicenseError] = useState(null);
+  const [checkingLicense, setCheckingLicense] = useState(true);
+
+  const checkLicense = async () => {
+    try {
+      const res = await apiFetch('/settings/license-status');
+      if (res.success) {
+        setLicenseValid(res.valid);
+        setLicenseError(res.valid ? null : res.message);
+      }
+    } catch (err) {
+      console.error("License check error:", err);
+      setLicenseValid(false);
+      setLicenseError(err.message || "Failed to verify system license.");
+    } finally {
+      setCheckingLicense(false);
+    }
+  };
 
   React.useEffect(() => {
-    if (user) {
+    checkLicense();
+
+    const handleLicenseInvalid = (e) => {
+      setLicenseValid(false);
+      setLicenseError(e.detail || 'License verification failed.');
+    };
+    window.addEventListener('license:invalid', handleLicenseInvalid);
+    return () => {
+      window.removeEventListener('license:invalid', handleLicenseInvalid);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (user && licenseValid) {
       setActiveTab('dashboard');
     }
-  }, [user?.id, user?.username]);
+  }, [user?.id, user?.username, licenseValid]);
+
+  if (checkingLicense) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-slate-400 font-semibold font-heading">Checking system license...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!licenseValid) {
+    return <LicenseActivation onActivated={() => { setLicenseValid(true); checkLicense(); }} />;
+  }
 
   if (!user) {
     return <Login />;

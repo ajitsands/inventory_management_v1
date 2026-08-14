@@ -176,4 +176,49 @@ class SettingsController extends Controller
             $this->error($e->getMessage(), 500);
         }
     }
+
+    /**
+     * POST /api/v1/settings/activate-license
+     * Public endpoint to activate the license key online
+     */
+    public function activateLicense()
+    {
+        // No Auth required since licensing locks the application pre-login
+        $data = $this->getRequestBody();
+        $licenseKey = trim($data['license_key'] ?? '');
+
+        if (empty($licenseKey)) {
+            $this->json(['error' => 'License Key is required.'], 400);
+            return;
+        }
+
+        require_once __DIR__ . '/../Services/LicenseService.php';
+
+        try {
+            LicenseService::activate($licenseKey);
+            $this->json([
+                'success' => true,
+                'message' => 'License activated successfully!'
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Activation failed: ' . $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * GET /api/v1/settings/license-status
+     * Public endpoint to verify license state locally
+     */
+    public function licenseStatus()
+    {
+        require_once __DIR__ . '/../Services/LicenseService.php';
+        $status = LicenseService::checkLicense();
+        
+        $this->json([
+            'success' => true,
+            'valid' => $status['valid'],
+            'message' => $status['message'],
+            'payload' => $status['payload'] ?? null
+        ]);
+    }
 }

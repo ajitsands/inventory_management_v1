@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { formatDate } from '../utils/date';
-import { Settings, Save, CheckCircle2, AlertCircle, Globe, Percent, Hash, Calculator, Trash2, AlertTriangle } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle, Globe, Percent, Hash, Calculator, Trash2, AlertTriangle, Key } from 'lucide-react';
 
 export default function StoreSettings() {
   const [settings, setSettings] = useState({
@@ -410,7 +410,71 @@ export default function StoreSettings() {
         </div>
       </form>
 
-      {/* 3. System Maintenance & Reset */}
+      {/* 3. Software Licensing & Verification Status */}
+      <div className="bg-white dark:bg-slate-900 glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-6 shadow-xs mt-6">
+        <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <Key className="w-4 h-4 text-brand-blue" /> Software Licensing & Activation Status
+          </h3>
+          <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            Fully Licensed & Verified
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div className="space-y-3">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Active License Key</span>
+              <div className="font-mono bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold break-all">
+                {settings.license_key || 'No key loaded'}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <Globe className="w-3.5 h-3.5 text-brand-blue" />
+              <span>Licensed Domain: <strong className="text-slate-700 dark:text-slate-300 font-mono">{window.location.host}</strong></span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-950 p-4.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+              <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Licensing Security Notice</h4>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                This system automatically verifies its cryptographic RSA activation token against SandsLab Key Server. Do not share your license key or attempt to modify system settings database values manually, as it will instantly lock the application.
+              </p>
+            </div>
+            <div className="pt-3 text-right">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm("De-activating the software will lock all application features. Are you sure?")) {
+                    try {
+                      const res = await apiFetch('/settings', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          license_key: '',
+                          license_token: '',
+                          license_public_key: ''
+                        })
+                      });
+                      if (res.success) {
+                        window.location.reload();
+                      }
+                    } catch (err) {
+                      alert(err.message || "Failed to de-activate license.");
+                    }
+                  }
+                }}
+                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 transition"
+              >
+                De-activate Software License
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. System Maintenance & Reset */}
       <div className="bg-rose-50 dark:bg-rose-950/20 p-6 rounded-3xl border border-rose-200 dark:border-rose-800/60 space-y-4 shadow-xs mt-6">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />

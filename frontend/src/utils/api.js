@@ -30,6 +30,9 @@ export async function apiFetch(endpoint, options = {}) {
         localStorage.removeItem('inv_user');
         window.dispatchEvent(new Event('auth:unauthorized'));
       }
+      if (data.license_error) {
+        window.dispatchEvent(new CustomEvent('license:invalid', { detail: data.message }));
+      }
       throw new Error(data.message || `Request failed with status ${response.status}`);
     }
 
