@@ -102,8 +102,7 @@ class LicenseService {
         
         $postData = [
             'license_key' => $licenseKey,
-            'domain_name' => $domain,
-            'ip_address' => $_SERVER['SERVER_ADDR'] ?? $_SERVER['LOCAL_ADDR'] ?? ''
+            'domain_name' => $domain
         ];
 
         // Make HTTP Call to licensing server

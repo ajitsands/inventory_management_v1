@@ -188,7 +188,7 @@ class SettingsController extends Controller
         $licenseKey = trim($data['license_key'] ?? '');
 
         if (empty($licenseKey)) {
-            $this->json(['error' => 'License Key is required.'], 400);
+            $this->json(['message' => 'License Key is required.'], 400);
             return;
         }
 
@@ -201,7 +201,7 @@ class SettingsController extends Controller
                 'message' => 'License activated successfully!'
             ]);
         } catch (\Exception $e) {
-            $this->json(['error' => 'Activation failed: ' . $e->getMessage()], 400);
+            $this->json(['message' => 'Activation failed: ' . $e->getMessage()], 400);
         }
     }
 
