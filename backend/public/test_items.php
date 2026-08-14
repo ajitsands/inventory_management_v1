@@ -3,7 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../core/Model.php';
-require_once __DIR__ . '/../Models/Item.php';
+require_once __DIR__ . '/../app/Models/Item.php';
 
 try {
     $items = Item::getAll();
