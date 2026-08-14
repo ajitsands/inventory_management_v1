@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
 import HorizontalNavbar from './components/HorizontalNavbar';
+import Footer from './components/Footer';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ItemManagement from './pages/ItemManagement';
@@ -57,6 +58,7 @@ function MainApp() {
         {activeTab === 'invoices-report' && <ReportsPage defaultSubTab="invoices" />}
         {activeTab === 'user-mgmt' && <UserManagement />}
       </main>
+      <Footer />
     </div>
   );
 }
