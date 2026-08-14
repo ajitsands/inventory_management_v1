@@ -459,12 +459,28 @@
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
                 </button>
-
                 <a href="<?= dirname($_SERVER['SCRIPT_NAME']) === '/' ? '/logout' : dirname($_SERVER['SCRIPT_NAME']) . '/logout' ?>" class="btn-logout">Logout</a>
             </div>
         </header>
 
-        <?php
+    <main>
+        <div class="main-header">
+            <div>
+                <h2>License Management</h2>
+                <p>Manage and monitor all active and inactive software licenses across domains.</p>
+            </div>
+            
+            <div class="actions">
+                <a href="/public/docs" class="btn btn-secondary">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    View API Documentation
+                </a>
+                <a href="/public/licenses/create" class="btn btn-primary">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Generate License Key
+                </a>
+            </div>
+        </div>    <?php
             // Calculate stats
             $total = count($licenses);
             $active = 0;

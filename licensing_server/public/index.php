@@ -41,7 +41,7 @@ $router->get('/licenses/create', ['LicenseController', 'showCreate']);
 $router->post('/licenses/create', ['LicenseController', 'create']);
 $router->post('/licenses/toggle', ['LicenseController', 'toggleStatus']);
 $router->get('/licenses/view', ['LicenseController', 'viewDetails']);
-
+$router->get('/docs', ['DocsController', 'index']);
 // Public Client Verification API Endpoint
 $router->post('/api/activate', ['ApiController', 'activate']);
 
