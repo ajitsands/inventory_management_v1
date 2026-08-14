@@ -115,6 +115,13 @@
             padding-bottom: 20px;
         }
 
+        .main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 30px;
+        }
+
         .logo {
             font-size: 24px;
             font-weight: 700;

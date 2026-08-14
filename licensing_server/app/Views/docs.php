@@ -9,13 +9,13 @@
     <style>
         :root {
             --primary: #1C8DCD;
-            --bg-color: #0A0E17;
-            --bg-gradient: radial-gradient(circle at 10% 20%, rgba(21, 32, 51, 0.5) 0%, rgba(10, 14, 23, 0.8) 90%);
-            --card-bg: rgba(255, 255, 255, 0.03);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-light: #F3F4F6;
-            --text-muted: #9CA3AF;
-            --code-bg: #111827;
+            --bg-color: #F8FAFC;
+            --bg-gradient: radial-gradient(circle at 10% 20%, #F1F5F9 0%, #E2E8F0 90%);
+            --card-bg: #FFFFFF;
+            --border-color: #E2E8F0;
+            --text-light: #1E293B;
+            --text-muted: #64748B;
+            --code-bg: #1E293B;
             --success: #10B981;
         }
 
@@ -40,14 +40,15 @@
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 40px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
             backdrop-filter: blur(10px);
         }
 
         h1, h2, h3 {
-            color: #fff;
+            color: var(--text-light);
             margin-top: 2em;
             margin-bottom: 0.5em;
+
         }
         h1 { margin-top: 0; font-size: 2.5em; color: var(--primary); }
         h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
