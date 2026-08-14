@@ -5,7 +5,7 @@ require_once __DIR__ . '/SequenceService.php';
 
 class LicenseService {
     // Configurable licensing server URL
-    private static $keyServerUrl = 'https://key.sandslab.com';
+    private static $keyServerUrl = 'https://key.sandslab.com/public';
 
     /**
      * Verify license locally using public key signature checks
