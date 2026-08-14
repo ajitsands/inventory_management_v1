@@ -268,23 +268,40 @@
             box-shadow: 0 0 10px var(--primary-glow);
         }
 
-        .btn-create {
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             padding: 12px 24px;
-            background: linear-gradient(135deg, var(--primary) 0%, #106294 100%);
             border: none;
             border-radius: 10px;
-            color: white;
             font-size: 15px;
             font-weight: 600;
             text-decoration: none;
             cursor: pointer;
             transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #106294 100%);
+            color: white;
             box-shadow: 0 4px 15px var(--primary-glow);
         }
 
-        .btn-create:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(28, 141, 205, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            background: rgba(255,255,255,0.1);
         }
 
         /* Licenses Table Card */

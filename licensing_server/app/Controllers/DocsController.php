@@ -8,6 +8,6 @@ class DocsController extends Controller {
         // We do not require auth for docs so developers can read them without a login
         // But you can add $this->requireAuth(); if you want them private.
         
-        $this->render('docs');
+        $this->view('docs');
     }
 }
