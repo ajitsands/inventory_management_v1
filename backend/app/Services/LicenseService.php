@@ -99,10 +99,15 @@ class LicenseService {
      */
     public static function activate($licenseKey) {
         $domain = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $resolvedIp = gethostbyname($domain);
+        if ($resolvedIp === $domain) {
+            $resolvedIp = $_SERVER['SERVER_ADDR'] ?? '';
+        }
         
         $postData = [
             'license_key' => $licenseKey,
-            'domain_name' => $domain
+            'domain_name' => $domain,
+            'ip_address' => $resolvedIp
         ];
 
         // Make HTTP Call to licensing server using cURL
