@@ -84,7 +84,7 @@ export default function Footer() {
                 Go to Web Site
               </a>
               <a
-                href="https://wa.me/973078079"
+                href="https://wa.me/97335078079"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setShowModal(false)}
