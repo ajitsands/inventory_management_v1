@@ -105,25 +105,35 @@ class LicenseService {
             'domain_name' => $domain
         ];
 
-        // Make HTTP Call to licensing server
+        // Make HTTP Call to licensing server using cURL
         $url = self::$keyServerUrl . '/api/activate';
-        $ctx = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => "Content-Type: application/json\r\nConnection: close\r\n",
-                'content' => json_encode($postData),
-                'timeout' => 8
-            ]
+        $ch = curl_init($url);
+        
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($postData),
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Connection: close'
+            ],
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
         ]);
 
-        $responseJson = @file_get_contents($url, false, $ctx);
+        $responseJson = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
         if ($responseJson === false) {
-            throw new Exception("Unable to connect to key server at " . self::$keyServerUrl);
+            throw new Exception("Connection failed: " . $curlError);
         }
 
         $res = json_decode($responseJson, true);
-        if (empty($res) || !$res['success']) {
-            throw new Exception($res['message'] ?? 'Activation server returned an error.');
+        if (empty($res) || !$res['success'] || $httpCode !== 200) {
+            throw new Exception($res['message'] ?? "Activation server returned error code " . $httpCode);
         }
 
         // Save settings to database
