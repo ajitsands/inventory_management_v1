@@ -28,7 +28,11 @@ class ApiController extends Controller {
 
         $licenseKey = trim($data['license_key'] ?? '');
         $clientDomain = trim($data['domain_name'] ?? '');
-        $clientIp = trim($data['ip_address'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
+        $realIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+        if (strpos($realIp, ',') !== false) {
+            $realIp = trim(explode(',', $realIp)[0]);
+        }
+        $clientIp = trim($data['ip_address'] ?? $realIp);
 
         if (empty($licenseKey) || empty($clientDomain)) {
             return $this->json([
