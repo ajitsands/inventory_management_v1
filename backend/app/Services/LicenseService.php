@@ -100,8 +100,15 @@ class LicenseService {
     public static function activate($licenseKey) {
         $domain = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $resolvedIp = gethostbyname($domain);
-        if ($resolvedIp === $domain) {
-            $resolvedIp = $_SERVER['SERVER_ADDR'] ?? '';
+        
+        // If the server resolves itself to localhost, fetch the true public IP
+        if ($resolvedIp === $domain || $resolvedIp === '127.0.0.1' || $resolvedIp === '::1' || strpos($resolvedIp, '192.168.') === 0 || strpos($resolvedIp, '10.') === 0) {
+            $publicIp = @file_get_contents('https://api.ipify.org');
+            if ($publicIp) {
+                $resolvedIp = trim($publicIp);
+            } else {
+                $resolvedIp = $_SERVER['SERVER_ADDR'] ?? '';
+            }
         }
         
         $postData = [
