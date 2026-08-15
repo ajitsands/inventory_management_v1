@@ -25,6 +25,7 @@ export default function StoreSettings() {
   const [submittingSequences, setSubmittingSequences] = useState(false);
   const [clearingTransactions, setClearingTransactions] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [showConfirmDeactivate, setShowConfirmDeactivate] = useState(false);
   const [message, setMessage] = useState(null);
 
   const loadData = async () => {
@@ -443,32 +444,54 @@ export default function StoreSettings() {
                 This system automatically verifies its cryptographic RSA activation token against SandsLab Key Server. Do not share your license key or attempt to modify system settings database values manually, as it will instantly lock the application.
               </p>
             </div>
-            <div className="pt-3 text-right">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (confirm("De-activating the software will lock all application features. Are you sure?")) {
-                    try {
-                      const res = await apiFetch('/settings', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          license_key: '',
-                          license_token: '',
-                          license_public_key: ''
-                        })
-                      });
-                      if (res.success) {
-                        window.location.reload();
-                      }
-                    } catch (err) {
-                      alert(err.message || "Failed to de-activate license.");
-                    }
-                  }
-                }}
-                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 transition"
-              >
-                De-activate Software License
-              </button>
+            <div className="pt-3 flex justify-end">
+              {!showConfirmDeactivate ? (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmDeactivate(true)}
+                  className="text-[10px] font-bold text-rose-600 hover:text-rose-700 transition"
+                >
+                  De-activate Software License
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 p-2.5 rounded-xl animate-in fade-in zoom-in duration-150 w-full justify-between">
+                  <span className="text-[10px] text-rose-700 dark:text-rose-300 font-extrabold text-left">
+                    De-activating the software will lock all application features. Are you sure?
+                  </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await apiFetch('/settings', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                              license_key: '',
+                              license_token: '',
+                              license_public_key: ''
+                            })
+                          });
+                          if (res.success) {
+                            window.location.reload();
+                          }
+                        } catch (err) {
+                          alert(err.message || "Failed to de-activate license.");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold transition-all"
+                    >
+                      Yes, De-activate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmDeactivate(false)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition-all hover:bg-slate-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
