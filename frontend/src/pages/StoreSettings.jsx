@@ -463,13 +463,8 @@ export default function StoreSettings() {
                       type="button"
                       onClick={async () => {
                         try {
-                          const res = await apiFetch('/settings', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                              license_key: '',
-                              license_token: '',
-                              license_public_key: ''
-                            })
+                          const res = await apiFetch('/settings/deactivate-license', {
+                            method: 'POST'
                           });
                           if (res.success) {
                             window.location.reload();

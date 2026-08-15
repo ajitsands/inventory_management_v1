@@ -221,4 +221,22 @@ class SettingsController extends Controller
             'payload' => $status['payload'] ?? null
         ]);
     }
+
+    public function deactivateLicense()
+    {
+        $user = $this->requireAuth();
+        if ($user['role'] !== 'ADMIN') {
+            $this->json(['error' => 'Admin authorization required.'], 403);
+            return;
+        }
+
+        $pdo = Model::getDB();
+        $stmt = $pdo->prepare("UPDATE system_settings SET setting_value = '' WHERE setting_key IN ('license_key', 'license_token', 'license_public_key')");
+        $stmt->execute();
+        
+        $this->json([
+            'success' => true,
+            'message' => 'License deactivated successfully.'
+        ]);
+    }
 }

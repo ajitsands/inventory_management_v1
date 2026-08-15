@@ -114,6 +114,7 @@ $router->post('/api/v1/settings/sequences', ['SettingsController', 'updateSequen
 $router->post('/api/v1/settings/clear-transactions', ['SettingsController', 'clearTransactionalData']);
 $router->get('/api/v1/settings/latest-products', ['SettingsController', 'getLatestProducts']);
 $router->post('/api/v1/settings/activate-license', ['SettingsController', 'activateLicense']);
+$router->post('/api/v1/settings/deactivate-license', ['SettingsController', 'deactivateLicense']);
 $router->get('/api/v1/settings/license-status', ['SettingsController', 'licenseStatus']);
 
 // Vendor Quotations & PO Routes
