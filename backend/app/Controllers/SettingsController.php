@@ -157,7 +157,6 @@ class SettingsController extends Controller
 
     public function getLatestProducts()
     {
-        $this->requireAuth();
         try {
             $ctx = stream_context_create([
                 "http" => [
